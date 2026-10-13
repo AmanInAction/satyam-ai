@@ -1,0 +1,8 @@
+{
+  "name": "Satyam AI - Scam & Misinformation Checker",
+  "description": "Decision-support web application to evaluate suspicious messages, claims, and URLs with transparent evidence and risk breakdown.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

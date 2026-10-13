@@ -2,125 +2,112 @@
 
 ## Purpose
 
-Validate behavior, security, integration reliability, evidence quality, and submission readiness. Tests must reflect actual behavior; do not replace failures with mock success without documenting the limitation.
+Validate product behavior, security boundaries, integration reliability, and submission readiness. Tests must verify actual behavior; do not replace failing tests with mocked success without documenting the limitation.
 
-## 1. Unit tests
+## Test layers
 
-- Deterministic patterns: urgency, impersonation, unusual payment, OTP/PIN/password requests, KYC/account-block threats, fake job/prize/loan signals, and locally relevant patterns.
-- URL parsing/normalization and suspicious-domain indicators.
+### 1. Unit tests
+- Deterministic text rules: urgency, impersonation cues, payment requests, credential/OTP requests, suspicious link patterns.
+- URL normalization and parsing.
 - Verdict mapping and uncertainty rules.
-- Zod request/response schema validation.
-- Bedrock output parsing: malformed JSON, missing fields, unexpected labels, refusal, prompt-injection attempts, timeout.
+- Zod runtime schema validation (`src/lib/validation/schemas.ts`).
+- Model output parsing, including malformed JSON, missing fields, unexpected labels, and provider refusal.
 - Provider status aggregation and partial-result logic.
-- Evidence URL validation, provenance, and sanitization.
-- Separate scam-risk and claim-verification verdicts.
+- Output sanitization and evidence URL validation.
 
-## 2. API tests
+### 2. API tests
+- Valid text and URL requests.
+- Empty input, whitespace-only input, malformed URL, unsupported scheme, and oversized input.
+- Unsupported content type and oversized screenshot (if enabled).
+- Rate limiting.
+- Provider timeout, missing credentials, quota errors, malformed provider responses, and total provider outage.
+- Consistent error schema and no stack-trace leakage.
+- Health endpoint does not expose secrets or sensitive configuration.
 
-- Valid text and URL submissions.
-- Empty/whitespace-only input, malformed URLs, unsupported schemes, and oversized requests.
-- Unsupported content type and oversized image if image input is enabled.
-- Rate limiting and duplicate submissions.
-- Missing credentials, quota errors, provider timeout, malformed provider response, and total outage.
-- Standard error envelope; no stack traces or secret leakage.
-- Health endpoint does not expose environment values or credentials.
-- Missing reputation/evidence result is never interpreted as a clean result.
+### 3. Security tests
+- Prompt-injection text in user submissions and retrieved pages is treated as untrusted content.
+- SSRF defenses for localhost, loopback, private, link-local, reserved IPs, unsafe ports, redirects, and DNS changes if target fetching exists.
+- File upload MIME/type and size validation.
+- CORS only permits intended frontend origins in deployment.
+- Secrets are not present in frontend bundles, logs, committed files, or error responses.
+- No raw submitted content is persisted unless explicitly designed, disclosed, and covered by retention rules.
 
-## 3. Security/privacy tests
+### 4. Frontend tests
+- Empty state and input validation.
+- Loading state and duplicate-submit handling.
+- Successful result rendering.
+- Partial-result state when one provider is unavailable.
+- Generic error state with retry guidance.
+- Evidence links are clickable and opened safely.
+- Mobile layout and keyboard navigation.
+- Clear distinction between “no evidence found” and “evidence of safety.”
 
-- User-submitted prompt injection and retrieved-page instructions are treated as untrusted content.
-- SSRF: localhost, loopback, private, link-local, reserved IPs, unsafe ports, redirect chains, and DNS rebinding if target fetching exists.
-- File MIME/type, size, and dimension checks.
-- CORS only allows intended production origins.
-- No secrets in client bundles, committed files, logs, or errors.
-- Raw text, URLs, and screenshots are not persisted by default.
-- Feedback/history behavior follows documented disclosure and retention rules.
+### 5. Integration and end-to-end tests
+- Full text-analysis flow from UI to API and back.
+- Full URL-analysis flow with provider adapters mocked.
+- At least one integration smoke test using real provider credentials, if available and safe.
+- Deployment smoke test for health, CORS, API connectivity, and result rendering.
 
-## 4. Frontend tests
+## Evaluation dataset
 
-- Empty state, validation, loading, and duplicate-submit handling.
-- Successful results and partial results.
-- Provider outage and retry guidance.
-- Evidence links and safe external-link behavior.
-- Separate scam-risk and claim-verification display.
-- Explicit “unverified” and missing-evidence explanation.
-- Mobile layout, keyboard navigation, and accessible labels.
-- Screenshot extracted-text review if implemented.
-
-## 5. Integration/E2E tests
-
-- Text flow from UI through `/api/v1/analyze/text`.
-- URL flow through `/api/v1/analyze/url`.
-- Evidence and reputation adapter behavior using mocks.
-- At least one real-provider smoke test if credentials are available, without exposing secrets.
-- Deployment smoke tests for health, CORS, API connectivity, and result rendering.
-- Verify real integrations versus mock adapters in the test report.
-
-## 6. Evaluation dataset
-
-Maintain a versioned set of examples with expected properties and rationale:
-1. Obvious phishing asking for OTP/credentials.
+Maintain a small versioned test set with expected properties, not necessarily a single rigid verdict:
+1. Obvious phishing message asking for credentials or OTP.
 2. Impersonation and urgent payment request.
-3. Legitimate routine bank/merchant notification.
-4. Ambiguous message without enough context.
+3. Legitimate routine notification.
+4. Ambiguous message with insufficient context.
 5. Suspicious-looking but benign URL.
 6. Known malicious URL fixture or mocked reputation result.
-7. Factual claim with credible supporting evidence.
-8. Factual claim with credible contradicting evidence.
-9. Claim with mixed evidence.
-10. Claim with no reliable evidence.
-11. Hindi scam message.
-12. Hinglish forwarded message.
-13. Indian UPI collect/payment scam scenario.
-14. Fake KYC/account-block threat.
-15. Digital-arrest/extortion-style threat.
-16. Fake job offer.
-17. Prompt-injection text embedded in the submission.
-18. Unreadable screenshot if image input is implemented.
+7. Unsupported factual claim with no reliable evidence.
+8. Claim with credible supporting evidence.
+9. Claim with credible contradicting evidence.
+10. Hindi scam message.
+11. Hinglish forwarded message.
+12. Malformed or adversarial prompt-injection content.
+13. Unreadable screenshot, if image input is implemented.
 
-Track:
-- false positives (legitimate content incorrectly flagged);
-- false negatives (harmful content missed);
-- evidence relevance and provenance;
-- whether uncertainty was handled correctly;
-- language clarity;
-- provider failure/partial-result correctness.
+Record false positives, false negatives, evidence quality, language clarity, and whether the response states uncertainty correctly. Do not claim statistical accuracy from a tiny demo set.
 
-Do not claim statistical accuracy from a small demo set. Report sample size, test composition, and limitations.
-
-## 7. Release checklist
+## Release checklist
 
 ### Functional
-- [ ] Text and URL analysis work end-to-end.
-- [ ] Separate scam-risk and claim-verification results render correctly.
-- [ ] Reasons, real evidence where available, next actions, limitations, and checks performed are returned.
-- [ ] Provider failures do not fabricate evidence or imply safety.
-- [ ] English/Hindi/Hinglish behavior is evaluated.
-- [ ] Screenshot flow is tested if included.
+- [ ] Text analysis works end-to-end.
+- [ ] URL analysis works end-to-end.
+- [ ] Results include verdict, reasons, evidence when available, actions, limitations, and check status.
+- [ ] Provider failures are handled without fabricated results.
+- [ ] Hindi/Hinglish and image flows are tested if included.
 
 ### Engineering
-- [ ] Lint/type checks pass.
-- [ ] Unit/API/integration tests pass or failures are explicitly recorded.
-- [ ] Production build passes.
-- [ ] README commands are reproducible.
-- [ ] `.env.example` contains placeholders, not secrets.
-- [ ] Current route/schema documentation matches implementation.
+- [ ] Lint and type checks pass.
+- [ ] Unit and API tests pass.
+- [ ] Frontend production build passes.
+- [ ] Backend starts cleanly using documented commands.
+- [ ] Environment variables are documented in `.env.example`.
+- [ ] Clean setup is reproducible from README instructions.
 
-### Security/privacy
-- [ ] No committed secrets or client-exposed credentials.
-- [ ] Request/file size limits, timeouts, and bounded retries enabled.
-- [ ] CORS/HTTPS/security headers verified in deployment.
-- [ ] Logs redacted.
-- [ ] Retention behavior documented.
-- [ ] SSRF controls tested if target fetching exists.
+### Security and privacy
+- [ ] No committed secrets.
+- [ ] No credentials in client bundle.
+- [ ] Request and file size limits enabled.
+- [ ] Timeouts and bounded retries enabled.
+- [ ] CORS and HTTPS verified in deployment.
+- [ ] Logs are redacted.
+- [ ] Data retention and deletion behavior documented.
+- [ ] SSRF protections tested if arbitrary URL fetching exists.
 
 ### Submission
-- [ ] Desktop/mobile smoke tests pass.
-- [ ] Demo examples are reproducible and do not imply unsupported certainty.
-- [ ] Known limitations and mock/real provider status documented.
-- [ ] No untested major feature is introduced at the last minute.
-- [ ] Demo assets ready by November 12, 2026.
+- [ ] Deployed demo smoke-tested on desktop and mobile.
+- [ ] Demo examples are reproducible.
+- [ ] Known limitations are documented.
+- [ ] No last-minute untested major feature.
+- [ ] Demo script and submission assets are ready by November 12, 2026.
 
 ## Test report format
 
-Record date/commit, environment, commands, pass/fail counts, failures and impact, manual checks not performed, provider mode (mock/real), and whether the release gate is `PASS`, `PARTIAL`, or `BLOCKED`.
+For each run, record:
+- Date and commit/hash if available.
+- Environment (local/staging/production).
+- Commands executed.
+- Pass/fail counts.
+- Failures and their impact.
+- Manual checks not performed.
+- Whether the release gate passes, partially passes, or is blocked.

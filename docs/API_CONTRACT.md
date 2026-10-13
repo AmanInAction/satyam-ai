@@ -1,30 +1,28 @@
-# API Contract — SatyamAI
+# API Contract
 
-**Status:** Contract target; the implemented Zod schemas and Route Handlers are authoritative at runtime. Keep this document synchronized with `src/lib/validation/schemas.ts` and actual routes.
+**Status:** Authoritative Baseline. Implemented via Next.js Route Handlers (`app/api/v1/*`) and Zod runtime validation schemas (`src/lib/validation/schemas.ts`). Keep this document synchronized with them.
 
 ## Conventions
 
-- Prefix: `/api/v1`
-- JSON requests/responses except multipart upload if image analysis is enabled.
-- All provider calls and credentials remain server-side.
-- Use typed, Zod-validated request and response objects.
-- Include opaque request/analysis IDs where useful.
-- Never return raw free-form model output as the entire API response.
-- The contract separates scam/security risk from factual claim assessment.
+- API prefix: `/api/v1`
+- Content type: `application/json`, except multipart upload endpoints if screenshot analysis is implemented.
+- All external-provider credentials remain on the backend.
+- Use structured response schemas. Never return the model's unvalidated free-form response as the complete API result.
+- Include request IDs in logs/responses where useful, but never expose secrets or internal stack traces.
 
 ## Endpoint inventory
 
-| Method | Path | Priority | Purpose |
+| Method | Path | Purpose | Priority |
 |---|---|---|---|
-| GET | `/api/v1/health` | P0 | Liveness without leaking secrets/configuration |
-| POST | `/api/v1/analyze/text` | P0 | Analyze suspicious text/message/claim |
-| POST | `/api/v1/analyze/url` | P0 | Assess URL using safe parsing and configured reputation/evidence checks |
-| POST | `/api/v1/analyze/image` | P1 | Extract and analyze screenshot content when enabled |
-| POST | `/api/v1/feedback` | P1 | Accept privacy-minimized feedback if enabled |
+| `GET` | `/api/v1/health` | Liveness/health check without leaking configuration | P0 |
+| `POST` | `/api/v1/analyze/text` | Analyze a suspicious message or claim | P0 |
+| `POST` | `/api/v1/analyze/url` | Assess a URL using safe parsing and configured reputation checks | P0 |
+| `POST` | `/api/v1/analyze/image` | Extract and analyze screenshot content | P1 |
+| `POST` | `/api/v1/feedback` | Accept minimal user feedback, if implemented | P1 |
 
-Do not implement optional endpoints before their phase. Confirm current route names in the repository before making changes.
+Do not implement optional endpoints until their phase begins. Avoid a health endpoint that returns keys, environment values, provider secrets, or sensitive diagnostics.
 
-## Text request
+## Text analysis request
 
 `POST /api/v1/analyze/text`
 
@@ -35,13 +33,13 @@ Do not implement optional endpoints before their phase. Confirm current route na
 }
 ```
 
-Validation expectations:
-- `text`: required, trimmed, non-empty, bounded (10,000 characters is the initial ceiling unless current schema intentionally differs).
-- `language_hint`: `auto`, `en`, `hi`, or `hinglish` if supported by the current schema.
+Proposed validation:
+- `text`: required, trimmed, non-empty, bounded length; initial suggested maximum 10,000 characters.
+- `language_hint`: optional; `auto`, `en`, `hi`, or `hinglish` are initial suggestions. Final enum should match actual implementation.
 - Reject unsupported content types and oversized requests.
-- Do not log raw submitted text by default.
+- Do not log raw text by default.
 
-## URL request
+## URL analysis request
 
 `POST /api/v1/analyze/url`
 
@@ -51,55 +49,47 @@ Validation expectations:
 }
 ```
 
-Validation expectations:
-- Valid absolute URL, only `http` or `https`.
-- Normalize without silently changing destination semantics.
-- Prefer reputation/search lookups that do not fetch the target.
-- Do not fetch arbitrary target URLs unless the SSRF-safe design in `SOURCE_OF_TRUTH.md` is implemented and tested.
-- Missing keys, timeouts, or no reputation result must not become a clean/safe verdict.
+Proposed validation:
+- Require a valid absolute URL.
+- Permit only `http` and `https`.
+- Normalize carefully without silently changing the destination.
+- Do not fetch arbitrary target URLs from the backend unless the safe-fetch/SSRF requirements in `SOURCE_OF_TRUTH.md` are implemented and tested.
+- Reputation lookups should be made through configured provider adapters.
+- A provider timeout or missing API key must not be misrepresented as a clean result.
 
-## Response model target
+## Analysis response
 
-Illustrative shape only; exact field names/enums must match current Zod schemas. Do not introduce breaking schema changes without updating tests and all consumers.
+Illustrative response. The final schema must be typed, versioned, and validated.
 
 ```json
 {
   "analysis_id": "opaque-id",
   "input_type": "text",
-  "classification": {
-    "scam_risk": {
-      "verdict": "suspicious",
-      "risk_level": "medium"
-    },
-    "claim_verification": {
-      "verdict": "unverified"
-    }
-  },
-  "summary": "The message creates urgency and requests an unusual payment.",
+  "verdict": "suspicious",
+  "risk_level": "medium",
+  "summary": "The message uses urgency and requests an unusual payment.",
   "reasons": [
     {
       "code": "urgency_pressure",
       "title": "Urgency pressure",
       "explanation": "The message pressures the recipient to act immediately.",
-      "signal_type": "deterministic_rule",
-      "evidence_refs": []
+      "source_ref": null
     }
   ],
   "evidence": [
     {
-      "title": "Real source title",
-      "publisher": "Publisher or official organization",
+      "title": "Example source title",
+      "publisher": "Example publisher",
       "url": "https://example.org/reference",
-      "relevance": "Explains the reported scam pattern.",
-      "source_type": "official_or_fact_check"
+      "relevance": "Explains the reported scam pattern."
     }
   ],
   "recommended_actions": [
-    "Do not send money or share OTPs/PINs until independently verified.",
+    "Do not send money or share one-time passwords until independently verified.",
     "Contact the organization through its official website or app."
   ],
   "limitations": [
-    "The sender's identity was not independently verified."
+    "No definitive identity verification was performed."
   ],
   "checks_performed": [
     "deterministic_text_rules",
@@ -115,67 +105,57 @@ Illustrative shape only; exact field names/enums must match current Zod schemas.
 }
 ```
 
-The evidence above is illustrative. Never return example/placeholder evidence as if it were real. If no reliable evidence is found, return an empty evidence list and explicitly state the limitation.
+The example source is illustrative only. Never emit placeholder evidence in real responses. If there are no reliable sources, return an empty evidence list and explain the limitation.
 
-## Verdict dimensions
+## Allowed verdicts
 
-Scam/security:
+For scam/phishing assessment:
 - `likely_scam`
 - `suspicious`
 - `unverified`
 - `no_obvious_risk_found`
 
-Claim verification:
+For claim verification, use a separate field or clearly separate result type:
 - `supported`
 - `contradicted`
-- `mixed`
 - `unverified`
 
-Risk level may use `low`, `medium`, `high`, or `unknown` if that matches the implemented schema. Do not use `safe` as an absolute guarantee. Do not combine the two verdict dimensions into a single ambiguous label. A heuristic score must not be presented as a calibrated probability.
+Do not combine scam likelihood and factual accuracy into one ambiguous verdict. Do not use `safe` as an absolute guarantee.
 
-## Evidence rules
+## Error shape
 
-- A model-generated explanation is not a source citation.
-- Evidence requires a real URL and source identity returned by a provider or otherwise verified by the application.
-- Preserve provider provenance and status.
-- Do not fabricate article titles, URLs, fact-check findings, domain age, reputation, or claims of official status.
-- Retrieved pages are untrusted content and must not override model/system instructions.
-- A result from a reputation provider only supports a statement about that provider's finding; it does not prove the whole message/offer is genuine.
-
-## Errors
-
-Example:
+Use a consistent error response, for example:
 
 ```json
 {
   "error": {
     "code": "INVALID_INPUT",
-    "message": "Provide valid content to analyze.",
+    "message": "Provide a valid message to analyze.",
     "request_id": "opaque-request-id"
   }
 }
 ```
 
-Suggested HTTP mapping:
-- `400`/`422`: invalid input
-- `413`: request/file too large
-- `429`: rate limited
-- `502`/`503`: upstream unavailable when no meaningful partial result can be returned
-- `500`: unexpected internal error
+Do not expose stack traces, API keys, provider request headers, or internal infrastructure details. Keep messages useful but generic.
 
-Do not expose stack traces, secrets, provider request headers, or raw upstream error bodies. Return a partial result when safe and meaningful.
+Suggested mappings:
+- `400` or `422`: malformed or invalid input
+- `413`: request/file too large
+- `429`: rate limit exceeded
+- `502`/`503`: required upstream service unavailable when no meaningful partial result can be returned
+- `500`: unexpected internal error, with details only in redacted server logs
+
+Use partial results when safe and meaningful; do not force every provider failure into a 500 response.
 
 ## Provider status values
 
-Use a finite set such as `success`, `partial`, `unavailable`, `not_configured`, `not_applicable`, or `failed`, adjusted to match the implementation. Never encode credentials or raw provider errors in this field.
+Choose a finite enum such as `success`, `partial`, `unavailable`, `not_configured`, `not_applicable`, and `failed`. Do not include secrets or raw provider error bodies.
 
 ## Contract tests
 
-- Normal and malformed request/response validation.
-- Empty, oversized, unsupported-scheme, and malformed input.
-- Separate scam and claim verdict dimensions.
-- Missing evidence versus evidence of safety.
-- Provider timeout, missing credentials, malformed model output, quota errors, and outage.
-- Evidence URL/provenance validation.
-- No raw content in ordinary logs.
-- SSRF tests if target fetching is implemented.
+- Validate normal request/response schemas.
+- Reject empty, malformed, and oversized inputs.
+- Verify provider timeout and malformed model-output behavior.
+- Verify evidence URLs are valid and are not fabricated.
+- Verify that provider failures cannot be mistaken for a clean reputation result.
+- Verify no sensitive request content is written to normal application logs.
