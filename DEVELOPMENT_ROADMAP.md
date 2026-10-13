@@ -1,189 +1,139 @@
-# Scam & Misinformation Checker — Development Roadmap
+# SatyamAI — Development Roadmap
 
+**Updated:** 2026-10-13  
 **Owner:** Solo developer  
-**Planning baseline:** October 13, 2026  
-**Submission window:** November 13–14, 2026  
-**Status:** Initial plan — update status as work is verified
+**Target submission:** 2026-11-13 to 2026-11-14
 
-> Read `SOURCE_OF_TRUTH.md` first. It defines what the product must do. This roadmap defines the order of work. Dates are targets, not permission to skip acceptance criteria.
+Read `SOURCE_OF_TRUTH.md` first. This roadmap sequences implementation; the source of truth defines intended behavior. Dates are targets, not evidence of completion.
 
-## Delivery strategy
+## Current known baseline
 
-Build a production-oriented modular monolith, not a collection of disconnected demos. Establish a working end-to-end flow early, then improve evidence quality, safety, reliability, and UX. Do not describe the product as production-ready until release gates have been verified.
+The migration report says the repository was moved to a full-stack Next.js App Router modular monolith, with TypeScript Route Handlers, Zod, provider interfaces, a mock adapter, an analysis orchestrator, and 19 passing tests at the time of that report. Real Bedrock/evidence/reputation integrations and user-facing accuracy are **not verified by that report**. Re-run commands and inspect current files before relying on prior status.
 
-## Phase 0 — Repository audit and foundation
-**Target:** October 13–14
+## Phase 0 — Repository and requirement audit
+**Status:** Reported completed previously; re-verify after any changes.
 
-### Tasks
-- [ ] Inspect the repository, current stack, manifests, scripts, tests, deployment configuration, and existing features.
-- [ ] Read `SOURCE_OF_TRUTH.md` and the original `scam_checker_architecture.xlsx` if available.
-- [ ] Map each requirement to existing code or mark it missing.
-- [ ] Identify required API keys, accounts, pricing/free-tier limits, and unavailable services.
-- [ ] Establish or verify local setup for Next.js frontend and FastAPI backend.
-- [ ] Add `.env.example` files, setup instructions, and `docs/DECISIONS.md`.
+- [x] Full-stack Next.js migration recorded in prior migration report.
+- [ ] Confirm current branch, working tree, file layout, scripts, tests, environment template, and deployment settings.
+- [ ] Map every requirement in `SOURCE_OF_TRUTH.md` to actual code.
+- [ ] Confirm no stale FastAPI/Express/Vite instructions remain in active docs.
+- [ ] Identify provider credentials, account setup, current API contracts, pricing, and quotas.
+- [ ] Mark real integrations versus mocks.
 
-### Acceptance criteria
-- [ ] Audit report documents the actual repository state.
-- [ ] Existing working code is preserved.
-- [ ] Local setup steps are reproducible.
-- [ ] Secrets are not committed.
+**Gate:** current audit report reflects the actual repository, not assumed status.
 
-## Phase 1 — API contracts and analysis skeleton
-**Target:** October 15–16
+## Phase 1 — API contract and analysis skeleton
+**Status:** Baseline reported present; verify.
 
-### Tasks
-- [ ] Define versioned endpoints under `/api/v1`.
-- [ ] Define Pydantic request/response models and commit the OpenAPI contract.
-- [ ] Separate API routes, orchestration, deterministic rules, LLM adapter, evidence adapter, and URL reputation adapter.
-- [ ] Add validation, size limits, timeouts, safe error mapping, and initial tests.
-- [ ] Use mocked providers for reliable local development.
+- [ ] Verify `app/api/v1/health`, `app/api/v1/analyze/text`, and `app/api/v1/analyze/url`.
+- [ ] Verify Zod request/response schemas match `docs/API_CONTRACT.md`.
+- [ ] Verify deterministic checks, orchestrator, and provider interfaces are cleanly separated.
+- [ ] Verify error envelopes, request IDs, input bounds, timeouts, and provider status handling.
+- [ ] Add regression tests for separate scam-risk and claim-verification dimensions.
+- [ ] Remove or clearly label any demo/mock output in user-facing production paths.
 
-### Acceptance criteria
-- [ ] API returns schema-valid mocked results.
-- [ ] Invalid and oversized input is rejected.
-- [ ] Provider failure returns a controlled error or partial result.
-- [ ] API contract is documented in `docs/API_CONTRACT.md`.
+**Gate:** valid structured responses and predictable partial-result behavior.
 
-## Phase 2 — End-to-end text-analysis MVP
-**Target:** October 17–20
+## Phase 2 — Reliable text-analysis MVP
+**Priority:** P0
 
-### Tasks
-- [ ] Implement text normalization and deterministic scam-pattern checks.
-- [ ] Add an LLM provider adapter that requests structured output.
-- [ ] Validate model output; do not trust arbitrary free-form text as the API response.
-- [ ] Build the initial Next.js interface with input, loading, results, and error states.
-- [ ] Connect frontend and backend.
-- [ ] Test the primary journey with mocked providers and real credentials where available.
+- [ ] Implement/verify deterministic India-relevant scam indicators.
+- [ ] Connect Amazon Bedrock through a server-only adapter using structured output.
+- [ ] Validate model output and handle refusals, malformed output, timeouts, and quotas.
+- [ ] Build or verify the accessible responsive input/results UX.
+- [ ] Keep model inference separate from evidence and deterministic signals.
+- [ ] Add Hindi, Hinglish, English, legitimate, and ambiguous test cases.
 
-### Acceptance criteria
-- [ ] User submits a message and receives a structured assessment.
-- [ ] Reasons and recommended actions are understandable.
-- [ ] Malformed model output or provider outage does not crash the app.
-- [ ] The UI does not claim that an item is definitely safe or false without evidence.
+**Gate:** text submission returns a schema-valid, explainable result without asserting certainty beyond evidence.
 
-## Phase 3 — URL analysis and evidence
-**Target:** October 21–23
+## Phase 3 — URL analysis and evidence retrieval
+**Priority:** P0
 
-### Tasks
-- [ ] Add safe URL parsing and deterministic indicators.
-- [ ] Integrate at least one URL-reputation provider if access/credentials are available.
-- [ ] Integrate fact-check or web-search evidence behind an adapter.
-- [ ] Display evidence title, publisher/domain, URL, and relevance.
-- [ ] Add partial-result behavior when an external provider fails.
-- [ ] Avoid fetching arbitrary URLs directly unless SSRF defenses are implemented and tested.
+- [ ] Verify safe URL parsing and normalization.
+- [ ] Integrate at least one real URL-reputation provider when credentials/access are available.
+- [ ] Integrate a real fact-check/search provider behind an adapter.
+- [ ] Display source title, publisher/domain, URL, and relevance.
+- [ ] Add source provenance/type where practical.
+- [ ] Handle provider outage, empty result, and conflicting signals distinctly.
+- [ ] Test URL abuse and SSRF controls if any server-side target fetching exists.
 
-### Acceptance criteria
-- [ ] Text and URL analysis both work end-to-end.
-- [ ] The app never invents reputation results, citations, or fact-check findings.
-- [ ] Missing evidence is described as unknown/unverified, not as proof of safety.
-- [ ] URL handling tests cover malformed URLs and unsafe destinations.
+**Gate:** no fabricated reputation or evidence; missing data is not treated as safe.
 
-## Phase 4 — Regional language and screenshot input
-**Target:** October 24–28
+## Phase 4 — Unified scam + misinformation assessment
+**Priority:** P0 product behavior; build on Phases 2–3
 
-### Tasks
-- [ ] Evaluate Hindi and Hinglish messages.
-- [ ] Tune output for clear, accessible language without overstating certainty.
-- [ ] Add screenshot upload and OCR/vision extraction only after the core flow is stable.
-- [ ] Validate MIME type, file size, and supported formats.
-- [ ] Where practical, show extracted text for user review before analysis.
+- [ ] Detect whether submission contains a fraud/security risk, a factual claim, both, or insufficient context.
+- [ ] Return separate scam/security and claim-verification fields.
+- [ ] Add claim extraction and evidence retrieval for factual assertions.
+- [ ] Use `supported`, `contradicted`, `mixed`, or `unverified` only when evidence supports the label.
+- [ ] Explain when the system found an existing fact-check versus when it generated an evidence-limited analysis.
+- [ ] Test claims with supporting, contradicting, mixed, and absent evidence.
 
-### Acceptance criteria
-- [ ] Hindi/Hinglish examples have understandable results.
-- [ ] Unsupported files and unreadable screenshots fail gracefully.
-- [ ] Uploads are bounded and processed safely.
-- [ ] Core text and URL flows remain stable.
+**Gate:** claim accuracy and scam risk are never collapsed into one ambiguous verdict.
 
-## Phase 5 — Security, privacy, reliability, and UX
-**Target:** October 29–November 2
+## Phase 5 — Screenshot input and regional UX
+**Priority:** P1, promote only if core is stable
 
-### Tasks
-- [ ] Add rate limiting, bounded retries, provider timeouts, and redacted logs.
-- [ ] Review secrets, CORS, security headers, dependencies, and deployment configuration.
-- [ ] Define data retention before storing raw submissions.
-- [ ] Avoid persisting raw submitted content by default.
-- [ ] Polish accessibility and mobile responsiveness.
-- [ ] Test provider outages, malformed inputs, and partial results.
+- [ ] Add screenshot upload with strict MIME, size, and dimension limits.
+- [ ] Extract text using a replaceable OCR/vision adapter.
+- [ ] Show extracted text for user review when practical.
+- [ ] Feed extracted text through the same analysis orchestrator.
+- [ ] Test unreadable, oversized, unsupported, sensitive, and adversarial images.
+- [ ] Improve Hindi/Hinglish result readability.
 
-### Acceptance criteria
-- [ ] Security/privacy checklist is completed with exceptions documented.
-- [ ] Failure paths are tested.
-- [ ] UI works on desktop and mobile and supports keyboard navigation.
-- [ ] No secrets are exposed to the browser or logs.
+**Gate:** image input uses the same safety, evidence, and uncertainty rules as text; it does not claim to authenticate a screenshot.
 
-## Phase 6 — Optional differentiators
-**Target:** November 3–5
+## Phase 6 — Security, privacy, reliability, UX
+**Priority:** P0 release gate
 
-Choose only after all P0 features and release gates are passing.
+- [ ] Audit prompt injection and treat submitted/retrieved content as untrusted.
+- [ ] Verify SSRF protections if URL fetching is present.
+- [ ] Verify rate limits, bounded retries, timeouts, redacted logs, security headers, and CORS.
+- [ ] Verify secrets are server-only and `.env.example` contains placeholders only.
+- [ ] Confirm raw content is not persisted by default.
+- [ ] Test graceful partial results for provider outages.
+- [ ] Complete keyboard, mobile, loading, empty, error, and partial-result UX checks.
 
-Possible options:
-- [ ] Telegram bot that reuses the same backend API.
-- [ ] Minimal feedback collection with explicit data-minimization.
-- [ ] Lightweight analysis history, only if retention and deletion behavior are defined.
-- [ ] PWA polish.
+**Gate:** all exceptions are documented and high-risk failures are fixed before optional work.
 
-Do not start browser extensions, deepfake detection, reverse-image search, custom model training, or microservices during this phase.
+## Phase 7 — Evaluation and release candidate
+**Target:** feature-complete by Nov 5; tested build by Nov 12
 
-### Acceptance criteria
-- [ ] Optional feature is integrated, not a mock.
-- [ ] Core app remains stable.
-- [ ] Revert or disable the optional feature if it regresses the core product.
+- [ ] Build a versioned evaluation set with legitimate, fraudulent, ambiguous, and unsupported cases.
+- [ ] Include English, Hindi, Hinglish, URLs, and claims with supporting/contradicting/no evidence.
+- [ ] Record false positives, false negatives, evidence quality, language clarity, and uncertainty handling.
+- [ ] Do not report accuracy percentages as statistically meaningful from a tiny demo set.
+- [ ] Run lint/type checks, all tests, production build, and deployment smoke tests.
+- [ ] Review every integration's real/mock status and required credentials.
+- [ ] Document known limitations and demo cases.
+- [ ] Rehearse the demo from a clean session.
 
-## Phase 7 — Evaluation, deployment, and submission readiness
-**Target:** November 6–12
+**Gate:** primary flows work on desktop/mobile; no unreported critical failure or fabricated evidence.
 
-### Tasks
-- [ ] Run lint, type checks, unit tests, API tests, and end-to-end smoke tests.
-- [ ] Evaluate obvious scams, legitimate messages, ambiguous cases, Hindi/Hinglish samples, phishing URLs, and unsupported claims.
-- [ ] Review false positives/negatives and revise unsafe wording.
-- [ ] Deploy frontend and backend.
-- [ ] Verify environment variables, CORS, health checks, logs, and external-provider behavior.
-- [ ] Finalize README, architecture notes, known limitations, and demo script.
-- [ ] Rehearse the demo from a clean browser session.
+## Phase 8 — Optional differentiators
+**Only after P0 release gates pass; target Nov 3–5 if timing permits**
 
-### Acceptance criteria
-- [ ] Setup and test commands are documented and reproducible.
-- [ ] Automated checks pass, or remaining failures are explicitly documented.
-- [ ] Deployed primary user journey passes smoke tests on desktop and mobile.
-- [ ] No secrets are present in the repository or client bundle.
-- [ ] Demo and submission assets are ready by November 12.
+Order of preference:
+1. Telegram bot reusing the same server-side analysis flow.
+2. Minimal feedback collection with data minimization.
+3. Basic cache only where useful and safe.
+4. History only if retention/deletion and disclosure are fully implemented.
 
-## Submission buffer
-**November 13–14**
+Do not start browser extensions, deepfake detection, reverse-image search, complex accounts, admin portals, custom training, or microservices during the submission window.
 
-- [ ] Fix submission-blocking bugs only.
-- [ ] Run the final smoke test.
-- [ ] Verify demo examples and links.
-- [ ] Avoid major features or architecture changes.
+**Gate:** feature is real, tested, documented, and does not regress core functionality. If time is short, defer it.
 
-## Priority guide
+## Submission buffer — Nov 13–14
 
-| Priority | Scope | Rule |
-|---|---|---|
-| P0 — Must ship | Text analysis, URL analysis, structured verdict, reasons, evidence where available, safe next steps, tests, deployment | Do not sacrifice these for optional features. |
-| P1 — Should ship | Hindi/Hinglish, screenshot OCR, limited feedback, basic caching | Implement after the primary flow is stable. |
-| P2 — Stretch | Telegram bot, history, PWA extras | Select only if time and release quality allow. |
-| Defer | Browser extension, deepfake detection, reverse-image search, complex accounts/admin, microservices | Do not begin without explicit approval. |
+- [ ] Fix critical/submission-blocking bugs only.
+- [ ] Re-run final smoke tests.
+- [ ] Confirm deployment configuration and demo evidence.
+- [ ] Avoid major features and architecture changes.
 
-## Definition of done
+## Agent's next-step selection rule
 
-A feature is done only when:
-- behavior matches `SOURCE_OF_TRUTH.md`;
-- inputs and outputs are validated;
-- success, error, timeout, and partial-result paths are handled;
-- relevant tests pass and results are reported honestly;
-- secrets and user data are handled safely;
-- documentation and configuration are updated;
-- it works in the integrated application;
-- limitations are explicit.
+At each session, inspect the repository and choose the highest-priority item that is both missing and feasible. Prefer the smallest complete vertical slice. If a provider needs credentials, implement/test the adapter and mock path, clearly report the blocker, and continue with other work. Do not invent keys or claim real integration success.
 
-## Required phase report from the agent
+## Required phase report
 
-After every phase, report:
-1. Status: `PASS`, `PARTIAL`, or `BLOCKED`.
-2. Files created or changed and why.
-3. Commands run and actual test/lint/build results.
-4. Manual verification still required.
-5. New environment variables, accounts, or API keys needed.
-6. Known bugs, risks, and deferred work.
-7. Roadmap status and `docs/DECISIONS.md` updates.
+Include status (`PASS`, `PARTIAL`, `BLOCKED`), files changed, commands and actual outputs, manual checks not performed, provider credentials/costs needed, known limitations, roadmap updates, and the single most useful next task.

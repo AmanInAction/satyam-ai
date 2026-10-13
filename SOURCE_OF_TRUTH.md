@@ -1,257 +1,194 @@
 # SOURCE_OF_TRUTH.md
-## Scam & Misinformation Checker — authoritative project specification
+## SatyamAI — Scam & Misinformation Checker
 
-**Document status:** Initial baseline for implementation  
-**Last updated:** 2026-10-13  
+**Status:** Authoritative product specification  
+**Updated:** 2026-10-13  
 **Owner:** Solo developer  
-**Target submission:** 2026-11-13 to 2026-11-14  
-**Purpose:** This file is the agent's highest-priority project specification. Read it before changing architecture or implementing features.
+**Target submission:** 2026-11-13 to 2026-11-14
 
----
+> Agent rule: read this document first, then `DEVELOPMENT_ROADMAP.md`, `docs/COMPETITIVE_GAP_ANALYSIS.md`, `docs/API_CONTRACT.md`, `docs/TEST_PLAN.md`, and `docs/DECISIONS.md`. Inspect the current repository before changing code. This specification defines intended behavior; the repository and test results define what is actually implemented.
 
-## 1. Authority and change control
+## 1. Product vision
 
-1. Treat this file as the canonical source of product requirements and implementation constraints.
-2. Treat `scam_checker_architecture.xlsx` as the original planning input. Where it proposes a feature, use this document's scope and priority to decide when to implement it.
-3. The roadmap describes sequencing; this file describes intended product behavior and constraints.
-4. If the existing repository conflicts with this specification, inspect the repository first and report the conflict with evidence. Do not perform destructive rewrites.
-5. Do not silently add dependencies, paid services, major infrastructure, or product scope. Document the reason and trade-off first.
-6. When a decision is genuinely blocking, ask one concise question. Otherwise choose the smallest reversible option, document it in `docs/DECISIONS.md`, and continue.
-7. Keep this file current when the owner explicitly approves a material scope or architecture change. Never rewrite requirements just to match an implementation shortcut.
+SatyamAI helps people assess suspicious messages, URLs, screenshots, and viral claims. It should combine deterministic checks, evidence retrieval, reputation signals, and AI-assisted interpretation into a single, understandable workflow.
 
-## 2. Product goal
+**Product promise:** one place to check suspicious content and understand what appears risky, what evidence supports the assessment, what remains uncertain, and what the user should do next.
 
-Build a responsive web application that helps people assess suspicious messages, URLs, and (when feasible) screenshots. It should explain **why** something may be risky, show evidence and source links where available, state uncertainty honestly, and give safe next steps.
+This is a decision-support tool—not an authority that can guarantee a message is safe, prove a payment settled, authenticate every document, or conclusively determine truth without evidence.
 
-This is a decision-support tool, not a definitive authority on truth or safety. It must not claim that an item is certainly safe or certainly false solely because a model says so.
+## 2. Product principles
 
-### Primary user journey
-1. User selects or enters text, a URL, or a supported screenshot.
-2. The application validates and normalizes the input.
-3. The backend runs relevant deterministic checks and AI-assisted analysis.
-4. Evidence retrieval is attempted where relevant and available.
-5. The verdict engine combines signals into a structured result.
-6. The UI displays a risk label, reasons, evidence links, uncertainty/limitations, and practical next steps.
-7. The user can optionally provide feedback on the result.
+1. Evidence before confidence: show sources and signals, not only an AI-generated verdict.
+2. Separate risk dimensions: scam/security risk and factual accuracy must not be collapsed into one label.
+3. Uncertainty is a valid result: missing evidence is not evidence of safety or falsity.
+4. India-aware, language-accessible UX: prioritize English, Hindi, and Hinglish and locally relevant scam patterns where supported.
+5. Privacy by default: do not persist raw submissions unless a feature explicitly requires it and retention/disclosure are implemented.
+6. Small, testable architecture: maintain a modular monolith; no microservices for the MVP.
+7. Provider independence: AI, evidence search, URL reputation, and OCR must sit behind replaceable adapters.
+8. Honest release reporting: mocks are not real integrations; never claim features or tests passed without verification.
 
-## 3. Target and delivery constraint
+## 3. Core user journey
 
-- The developer is working alone.
-- Target submission window: **November 13–14, 2026**.
-- A usable end-to-end MVP must exist early; do not leave integration until the final week.
-- Aim to have a feature-complete release candidate by November 5 and a tested submission build by November 12.
-- Production-oriented engineering is required, but do not claim the system is production-ready until the relevant security, privacy, reliability, and operational checks have actually passed.
-- Prefer a small, maintainable system over microservices or premature infrastructure.
+1. User pastes a message/claim, enters a URL, or submits a supported screenshot when image input is enabled.
+2. The app validates input and classifies the analysis type.
+3. Deterministic rules identify observable signals.
+4. Relevant evidence and reputation providers are queried when configured.
+5. Amazon Bedrock is used through a server-only provider adapter for contextual interpretation, structured extraction, and a readable explanation.
+6. The orchestrator combines available signals without allowing one missing provider to become a false “safe” verdict.
+7. The UI presents separate scam-risk and claim-verification results as applicable, reasons, sources, uncertainty, checks performed, and next steps.
+8. User can optionally submit privacy-minimized feedback.
 
-## 4. Product scope and priorities
+## 4. Scope and priority
 
-### P0 — required core
-- Responsive web application.
-- Text/message analysis.
-- URL analysis.
-- Structured API response with verdict, risk level, reasons, evidence/source links, uncertainty, and next steps.
-- Deterministic scam-pattern checks combined with LLM analysis.
-- Evidence retrieval integration with graceful degradation if an external service is unavailable.
-- URL reputation check through at least one configured, supported provider when credentials are available.
-- Hindi/Hinglish input support to the extent supported by the selected model and sources.
-- Input validation, safe error responses, request size limits, timeouts, rate limiting, secrets management, and automated tests.
-- Useful empty, loading, success, partial-result, and error states in the UI.
-- Deployment instructions and a reproducible local development setup.
+### P0 — required MVP
+- Full-stack Next.js App Router application using TypeScript and Route Handlers.
+- Text/message analysis and URL analysis.
+- A single results experience that can classify a submission as scam/security risk, factual claim, both, or insufficient information.
+- Structured, validated API response with analysis type, verdict(s), risk level, reasons, evidence, recommended actions, limitations, checks performed, and provider status.
+- Deterministic scam-pattern checks plus server-side AI-assisted analysis.
+- Evidence retrieval through an adapter; prefer relevant existing fact checks and reliable source retrieval when available.
+- At least one configured URL-reputation provider when credentials/access are available; missing provider results must be reported as unknown/unavailable.
+- English, Hindi, and Hinglish handling to the extent supported by configured models and sources.
+- Transparent uncertainty and a visible distinction between “no evidence found” and “evidence of safety.”
+- Validation, bounded requests, rate limits, timeouts, safe error handling, secret isolation, prompt-injection defenses, and SSRF protections for any server-side fetching.
+- Responsive, accessible UI with loading, success, partial-result, empty, and error states.
+- Automated tests and a documented evaluation dataset.
+- Reproducible setup and accurate known-limitations documentation.
 
-### P1 — implement after P0 is stable
-- Screenshot upload and OCR/vision-based text extraction.
-- Feedback submission stored without exposing secrets or unnecessary personal information.
-- Limited analysis history only if privacy and data-retention behavior are explicitly implemented.
-- Basic caching for safe-to-cache lookups, with TTL and no accidental storage of sensitive raw content.
-- Telegram bot if the end-to-end web flow is already reliable and time remains.
+### P1 — after P0 is stable
+- Screenshot upload with OCR/vision extraction, size/type checks, and extracted-text review where practical.
+- Minimal feedback capture.
+- Telegram bot that reuses the same analysis pipeline/API, only if time allows and security checks pass.
+- Basic safe caching with TTL if a real need is demonstrated.
+- Lightweight history only if privacy disclosure, retention, and deletion are explicitly implemented.
 
-### P2 — do not build before approval / spare time
+### P2 — defer unless explicitly approved
 - Browser extension.
-- Reverse-image search, deepfake detection, or advanced image forensics.
-- Complex user accounts, social features, or an administrative portal.
-- Multi-service/microservice architecture.
+- Reverse-image search, deepfake detection, or advanced media forensics.
+- Complex accounts, social/community features, or admin portal.
 - Custom model training.
-- Any feature not needed for the primary user journey.
+- Microservices or infrastructure added without demonstrated need.
 
-## 5. Architecture baseline
+## 5. Differentiation requirements
 
-Use a modular monolith for the first release.
+These are product requirements to evaluate and implement incrementally; they are not claims that every competitor lacks the feature.
 
-### Client
-- **Next.js** web application.
-- **Tailwind CSS** for styling.
-- Accessible, responsive components; a consistent design system.
-- PWA support is optional and must not delay the core app.
+### D1. Unified multi-risk assessment
+Support a coherent flow for suspicious text, URLs, and eventually screenshots. Detect whether the content appears to involve fraud/security risk, a factual claim needing verification, both, or neither/insufficient context. Keep the resulting verdict dimensions separate.
 
-### API and analysis
-- **Python + FastAPI** backend.
-- Version the API, e.g. `/api/v1`.
-- Keep request validation, provider integrations, analysis orchestration, verdict logic, and response serialization in separate modules.
-- Use typed schemas and a stable response contract.
-- Never expose AI, search, or reputation-provider credentials to the browser.
+### D2. Evidence-backed explanations
+Each evidence item must have a real title, publisher/domain, URL, and relevance explanation. Mark evidence origin/type where feasible (official source, fact-check publisher, reputation provider, other source). Never invent a source or imply a model explanation is a citation. If only AI inference is available, say so explicitly.
 
-### Persistence and cache
-- Prefer **PostgreSQL** (Supabase is acceptable as a managed option) if persistence is needed.
-- Redis/Upstash is optional; add it only when there is a demonstrated caching need.
-- Do not store raw submitted content by default. If history/feedback requires storage, minimize fields, document retention, and provide clear user disclosure.
-- The core analysis must work without optional persistence services.
+### D3. India-specific patterns and accessible language
+Build a maintainable rule catalogue for relevant patterns such as UPI collect/payment requests, OTP/PIN/credential requests, KYC/account-block threats, digital-arrest/extortion language, fake job offers, impersonation, prize/loan offers, and urgent payment pressure. Rules are indicators, not proof. Prioritize Hindi/Hinglish and English examples. Add regional languages only after evaluation and a clear need.
 
-### External providers from the original planning spreadsheet
-- LLM: Claude Sonnet/Haiku was the spreadsheet's initial proposal.
-- Evidence: Google Fact Check Tools API and/or a web-search provider such as Tavily or Brave.
-- URL reputation: Google Safe Browsing and/or VirusTotal.
-- OCR: a vision-capable model or Tesseract, selected based on reliability, cost, and availability.
-- Hosting: Vercel for Next.js; Render or Railway for FastAPI are initial options.
+### D4. Calibrated uncertainty
+Use clear verdicts such as `likely_scam`, `suspicious`, `unverified`, `no_obvious_risk_found`; for claims use `supported`, `contradicted`, `mixed`, or `unverified` only when evidence supports that classification. Include confidence band only if it has a defined interpretation and is tested. Do not present an unvalidated model score as a probability. Explain missing checks and limitations.
 
-**Provider decision rule:** Build thin provider adapters so the LLM, search, reputation, and OCR providers can be swapped without rewriting product logic. Use environment variables and a documented configuration. Do not assume API keys or paid access exist. Before implementing a provider, verify the current SDK/API contract from its official documentation if web access is available, and note required secrets, free-tier limits, and fallback behavior. Do not block core development while waiting for optional credentials.
+### D5. Evidence and signal fusion
+Use deterministic rules, configured reputation signals, retrieved fact checks/sources, and AI interpretation as distinct signals. The orchestrator must handle disagreement and provider outages. It must never treat a missing provider response as a clean result.
 
-## 6. Verdict and response contract
+### D6. Low-friction access
+Keep the web experience simple enough for a non-technical user. Telegram is a stretch integration and must call the same server-side analysis path rather than duplicating business logic.
 
-Use a finite set of understandable labels. Suggested initial labels:
+### D7. Measurable evaluation
+Maintain a labeled set of legitimate, fraudulent, ambiguous, Hindi/Hinglish, URL, and claim examples. Track false positives, false negatives, evidence quality, language clarity, and uncertainty handling. Do not claim statistical accuracy from a small demo set.
+
+## 6. Architecture constraints
+
+The current repository baseline is a **full-stack Next.js modular monolith**:
+- Next.js App Router and React UI.
+- TypeScript Route Handlers under `/api/v1`.
+- Zod runtime validation.
+- Domain/orchestration logic separated from Route Handlers.
+- Server-only provider adapters.
+- Vitest tests.
+- Amazon Bedrock is the chosen model platform; keep model IDs/configuration replaceable and do not hard-code a model choice into domain logic.
+
+Do not reintroduce a separate FastAPI/Express/Vite server unless the owner explicitly approves a documented architecture change. Do not silently change the established Next.js architecture.
+
+Potential provider categories:
+- LLM: Amazon Bedrock model adapter.
+- Evidence: fact-check search and/or web-search adapter.
+- URL reputation: Google Safe Browsing, VirusTotal, or another provider chosen after checking current API access, terms, cost, quotas, and coverage.
+- OCR: Bedrock vision model or OCR library/provider, chosen after evaluating reliability, cost, and supported formats.
+
+Provider interfaces should be thin and typed. Do not assume credentials exist. Mocks are allowed for tests and offline development but must be visibly identified as mocks and never presented to users as real provider results.
+
+## 7. Verdict and response principles
+
+Scam/security assessment labels:
 - `likely_scam`
 - `suspicious`
 - `unverified`
 - `no_obvious_risk_found`
 
-Do not use `safe` as an absolute guarantee. For misinformation/claim checking, distinguish `supported`, `contradicted`, and `unverified` where sufficient evidence exists. Do not collapse scam likelihood and factual accuracy into one ambiguous label.
+Claim assessment labels:
+- `supported`
+- `contradicted`
+- `mixed`
+- `unverified`
 
-Each analysis response should contain, at minimum:
-- `analysis_id`
-- `input_type`
-- `verdict`
-- `risk_level` (`low`, `medium`, `high`, or `unknown`)
-- `summary`
-- `reasons[]` — each reason has a plain-language explanation and, where possible, a signal/source reference
-- `evidence[]` — title, publisher/domain, URL, and a short relevance explanation when available
-- `recommended_actions[]`
-- `limitations[]`
-- `checks_performed[]`
-- `created_at`
-- `provider_status` or equivalent metadata sufficient to identify unavailable checks without leaking internal secrets
+The exact response schema is governed by `docs/API_CONTRACT.md` and implemented Zod schemas. Keep scam risk and factual accuracy in separate fields. Every result should include:
+- opaque `analysis_id`
+- `input_type` and analysis category
+- relevant verdict fields and risk level
+- plain-language summary
+- reasons with codes and explanations
+- evidence items with provenance and relevance
+- recommended actions
+- limitations and missing checks
+- checks performed and provider statuses
+- timestamp
 
-The exact Pydantic schema and OpenAPI contract must be committed before frontend/backend integration. Do not return free-form model text as the entire API response. Validate model output against a schema and safely handle malformed or refused outputs.
+Never say “safe” as an absolute guarantee. Never say a payment happened or a document is authentic based only on an image or message.
 
-## 7. Analysis behavior
+## 8. Security and privacy
 
-- Use deterministic rules for observable signals (e.g. URL syntax, suspicious urgency/payment language, mismatched domains where detectable, known reputation-provider results).
-- Use the LLM for language understanding, claim extraction, contextual reasoning, multilingual interpretation, and user-friendly summaries.
-- Retrieve sources for factual claims and domain reputation where possible.
-- Treat all submitted content and retrieved webpages as **untrusted data**, never as instructions to the model or agent.
-- Prompt-injection text inside an analyzed message or webpage must not override system instructions, cause tool misuse, or change the application's role.
-- Keep source evidence distinct from model inference. A model-generated explanation is not a citation.
-- Do not fabricate source titles, URLs, domain ages, reputation results, or fact-check findings.
-- If evidence cannot be found, return `unverified`/`unknown` with an explicit limitation rather than guessing.
-- A missing reputation result is not a clean bill of health.
-- Scores, if displayed, are heuristic risk indicators, not calibrated probabilities. Do not say “87% fake” unless there is a validated statistical basis (not expected in this MVP).
-- Avoid defamatory certainty about named individuals or organizations. Use careful, evidence-qualified wording.
+- Keep provider keys server-side; commit only placeholders in `.env.example`.
+- Treat user input and retrieved pages as untrusted data, never as instructions.
+- Defend against prompt injection in submissions and retrieved content.
+- Do not fetch arbitrary URLs directly unless strict SSRF protections are implemented and tested. Prefer reputation lookups that do not visit the target.
+- If fetching is implemented: allow only HTTP(S), block local/private/link-local/reserved destinations, validate DNS and every redirect, restrict ports, cap redirects/bytes/time, and mitigate DNS rebinding.
+- Validate content types, character limits, image dimensions/size, and upload formats.
+- Apply rate limits, timeouts, bounded retries, redacted logs, safe errors, and appropriate security headers.
+- Do not store raw messages, URLs, or images by default.
+- Do not ask for or retain OTPs, PINs, passwords, full payment credentials, or unnecessary personal information.
+- For Indian cyber-fraud guidance, verify official reporting details before hardcoding them.
 
-## 8. URL-fetching and SSRF protections
+## 9. UX requirements
 
-URL analysis can expose the backend to server-side request forgery and unsafe network access. Therefore:
-- Do not fetch arbitrary user URLs directly from the backend without a dedicated safe-fetch design.
-- Prefer reputation/search provider lookups that do not require visiting the target URL.
-- If page retrieval is necessary, allow only `http`/`https`; reject localhost, private, loopback, link-local, reserved, and internal IP ranges; validate DNS resolution and every redirect; block nonstandard ports unless explicitly required; cap redirects, response bytes, and timeouts; and defend against DNS rebinding.
-- Never execute downloaded content or render untrusted HTML directly.
-- Treat URLs and message text as hostile input. Add tests for malicious URLs and redirect chains.
+- Results must be easy to scan on mobile.
+- Make verdict, reasons, evidence, uncertainty, and next action prominent.
+- Use plain language; avoid fear-based or absolute wording.
+- Explain which checks actually ran and which could not run.
+- Distinguish a technical reputation result from the truth of the message/offer.
+- Evidence links open safely and are clearly attributed.
+- Show an advisory disclaimer for high-impact financial/security decisions.
+- Allow users to review extracted screenshot text before proceeding when practical.
 
-## 9. Security, privacy, and reliability requirements
+## 10. Release acceptance
 
-- Store secrets only in environment variables or a secret manager; commit only `.env.example` with placeholders.
-- Never log API keys, auth headers, full sensitive message bodies, or uploaded images by default.
-- Enforce content-type, length, file-size, and allowed-format validation.
-- Use timeouts and bounded retries for third-party calls; do not retry non-idempotent operations blindly.
-- Apply rate limiting to expensive endpoints.
-- Configure CORS narrowly for the deployed frontend.
-- Use HTTPS in deployment.
-- Return generic user-facing errors and keep detailed diagnostics server-side with redaction.
-- Add security headers where appropriate and pin/maintain dependencies responsibly.
-- Define data retention and deletion behavior before persisting user-submitted content.
-- Keep analysis endpoints resilient: one provider failing should produce a partial result when safe and meaningful, not an unhandled 500.
-- No claim of production readiness without tests, deployment checks, and a documented known-limitations list.
+The MVP is not complete until:
+- text and URL flows work end-to-end in the integrated app;
+- actual provider integrations are distinguished from mocks;
+- schema, error, timeout, partial-result, and provider-outage paths are tested;
+- SSRF and prompt-injection protections are tested where applicable;
+- evaluation covers legitimate, malicious, ambiguous, and multilingual cases;
+- false-positive and false-negative examples are reviewed;
+- no secrets leak into client bundles or logs;
+- data handling and known limitations are documented;
+- clean setup, production build, and deployment smoke tests pass;
+- results do not fabricate evidence or overstate certainty.
 
-## 10. UX requirements
+## 11. Agent workflow
 
-- Clearly explain what the tool can and cannot determine.
-- Make verdict, key reasons, evidence, and next action easy to scan.
-- Support mobile screens and keyboard navigation.
-- Provide loading progress or stage labels without inventing certainty.
-- Show a clear distinction between “no evidence found” and “evidence of safety.”
-- Evidence links must be clickable and opened safely.
-- Include a disclaimer that this tool is advisory and users should independently verify high-impact financial or security decisions.
-- For suspected Indian cyber financial fraud, it may recommend contacting the official cybercrime reporting portal or helpline, but verify current official instructions before hardcoding details.
-
-## 11. Testing and acceptance gates
-
-### Minimum automated coverage
-- Unit tests for deterministic scam rules and verdict mapping.
-- Schema validation tests for normal, malformed, and incomplete LLM responses.
-- API tests for text/URL validation, size limits, provider failure, timeout, and error mapping.
-- SSRF-related tests if any URL fetching is implemented.
-- Frontend tests for loading, error, partial result, and successful result states.
-- Integration test for the primary end-to-end flow using mocked external services.
-- At least a small, documented evaluation set covering obvious scams, legitimate messages, ambiguous messages, Hindi/Hinglish samples, phishing URLs, and unsupported claims.
-
-### Release gate
-- Clean setup from README instructions.
-- Lint/type checks and automated tests pass.
-- No secrets in repository or client bundle.
-- Core flow works on desktop and mobile.
-- Third-party outages produce understandable partial results.
-- Deployment health checks pass.
-- Known limitations and data-handling behavior are documented.
-- Demo uses representative examples and does not misrepresent model confidence.
-
-## 12. Repository and agent workflow
-
-Before coding:
-1. Inspect the current repository and report the actual state: files, stack, existing functionality, scripts, tests, and deployment setup.
-2. Do not assume a blank repository and do not overwrite existing work.
-3. Propose or adapt a clean structure. A reasonable baseline is:
-   - `frontend/` — Next.js app
-   - `backend/` — FastAPI app
-   - `docs/` — decisions, API contract, test plan, known limitations
-   - `SOURCE_OF_TRUTH.md`
-4. Establish local setup and environment templates.
-5. Write the API contract before parallel frontend/backend implementation.
-
-For every phase:
-- State the objective and acceptance criteria.
-- Implement the smallest complete vertical slice.
-- Run relevant tests and lint/type checks.
-- Report files changed, commands run, test outcomes, manual verification still needed, and known issues.
-- Update the roadmap status and `docs/DECISIONS.md`.
-- Do not report a phase complete when its acceptance criteria are not met.
-- Do not silently skip failing tests, fabricate test results, or replace real integrations with hardcoded success.
-- Prefer small, reviewable changes. The developer is solo and needs to understand and maintain the code.
-
-## 13. Timeline and milestones
-
-- **Oct 13–16:** repository audit, requirements, architecture, API contract, design foundation.
-- **Oct 17–23:** working text/URL analysis vertical slice; frontend integrated with backend.
-- **Oct 24–30:** evidence and reputation providers, multilingual handling, screenshot/OCR if core is stable.
-- **Oct 31–Nov 5:** reliability, security hardening, UX, optional feedback/history/Telegram if justified.
-- **Nov 6–12:** regression, evaluation, deployment, documentation, demo rehearsal, submission assets.
-- **Nov 13–14:** submission window; only fix critical defects. Avoid major feature additions.
-
-## 14. Definition of done
-
-A feature is done only when:
-- its behavior matches the accepted requirement;
-- input/output schemas are validated;
-- success, failure, and partial-result paths are handled;
-- relevant automated tests pass;
-- secrets and user data are handled safely;
-- documentation/configuration is updated;
-- it works in the integrated application, not only in isolation;
-- limitations are explicit.
-
-## 15. First task for the coding agent
-
-**Do not start by implementing every feature.** First inspect the repository and the planning spreadsheet, read this file, and produce a short audit containing:
-1. current repository state and commands;
-2. requirement-to-existing-code mapping;
-3. risks, blockers, and unknown credentials;
-4. recommended phase-1 task list;
-5. any conflicts with this source of truth.
-
-Then begin Phase 0/1 without waiting for approval on routine, reversible choices. Ask only about decisions that materially affect cost, privacy, provider access, or product scope.
+At the start of each work session:
+1. Read this file, roadmap, API contract, test plan, decisions, and competitive-gap document.
+2. Inspect actual repository state and current tests before editing.
+3. Map requirements to code and mark each `implemented`, `partial`, `missing`, `blocked`, or `deferred`.
+4. Implement the next highest-priority missing requirement, not every stretch feature at once.
+5. Run relevant tests/build/lint and report actual output.
+6. Update the roadmap, API contract if schemas changed, test plan if coverage changed, and decision log for material decisions.
+7. Report changed files, tests, manual checks, new credentials/costs, limitations, and next recommended task.
+8. Never report a requirement as complete merely because documentation was updated.
