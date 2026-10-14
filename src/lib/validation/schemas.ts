@@ -45,10 +45,31 @@ export type ScamVerdict = z.infer<typeof ScamVerdictSchema>;
 export const RiskLevelSchema = z.enum(['low', 'medium', 'high', 'unknown']);
 export type RiskLevel = z.infer<typeof RiskLevelSchema>;
 
+export const ClaimVerdictSchema = z.enum([
+  'supported',
+  'contradicted',
+  'mixed',
+  'unverified',
+]);
+export type ClaimVerdict = z.infer<typeof ClaimVerdictSchema>;
+
+export const ClassificationSchema = z.object({
+  scam_risk: z.object({
+    verdict: ScamVerdictSchema,
+    risk_level: RiskLevelSchema,
+  }),
+  claim_verification: z.object({
+    verdict: ClaimVerdictSchema,
+  }),
+});
+export type Classification = z.infer<typeof ClassificationSchema>;
+
 export const ReasonItemSchema = z.object({
   code: z.string(),
   title: z.string(),
   explanation: z.string(),
+  signal_type: z.string().optional(),
+  evidence_refs: z.array(z.string()).optional().default([]),
   source_ref: z.string().nullable().optional(),
 });
 export type ReasonItem = z.infer<typeof ReasonItemSchema>;
@@ -58,6 +79,7 @@ export const EvidenceItemSchema = z.object({
   publisher: z.string(),
   url: z.string().url(),
   relevance: z.string(),
+  source_type: z.string().optional(),
 });
 export type EvidenceItem = z.infer<typeof EvidenceItemSchema>;
 
@@ -74,8 +96,9 @@ export type ProviderStatus = z.infer<typeof ProviderStatusEnum>;
 export const AnalysisResponseSchema = z.object({
   analysis_id: z.string(),
   input_type: z.enum(['text', 'url', 'image']),
-  verdict: ScamVerdictSchema,
-  risk_level: RiskLevelSchema,
+  classification: ClassificationSchema,
+  verdict: ScamVerdictSchema.optional(),
+  risk_level: RiskLevelSchema.optional(),
   summary: z.string(),
   reasons: z.array(ReasonItemSchema),
   evidence: z.array(EvidenceItemSchema),

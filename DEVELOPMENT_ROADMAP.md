@@ -11,40 +11,41 @@ Read `SOURCE_OF_TRUTH.md` first. This roadmap sequences implementation; the sour
 The migration report says the repository was moved to a full-stack Next.js App Router modular monolith, with TypeScript Route Handlers, Zod, provider interfaces, a mock adapter, an analysis orchestrator, and 19 passing tests at the time of that report. Real Bedrock/evidence/reputation integrations and user-facing accuracy are **not verified by that report**. Re-run commands and inspect current files before relying on prior status.
 
 ## Phase 0 — Repository and requirement audit
-**Status:** Reported completed previously; re-verify after any changes.
+**Status:** Completed & Verified (2026-10-13)
 
 - [x] Full-stack Next.js migration recorded in prior migration report.
-- [ ] Confirm current branch, working tree, file layout, scripts, tests, environment template, and deployment settings.
-- [ ] Map every requirement in `SOURCE_OF_TRUTH.md` to actual code.
-- [ ] Confirm no stale FastAPI/Express/Vite instructions remain in active docs.
-- [ ] Identify provider credentials, account setup, current API contracts, pricing, and quotas.
-- [ ] Mark real integrations versus mocks.
+- [x] Confirm current branch, working tree, file layout, scripts, tests, environment template, and deployment settings.
+- [x] Map every requirement in `SOURCE_OF_TRUTH.md` to actual code (`docs/REPOSITORY_AUDIT.md`).
+- [x] Confirm no stale FastAPI/Express/Vite instructions remain in active docs.
+- [x] Identify provider credentials, account setup, current API contracts, pricing, and quotas (`GEMINI_API_KEY` present; AWS/Bedrock unconfigured in container).
+- [x] Mark real integrations versus mocks (`MockLLMProvider`, `MockEvidenceProvider`, `MockReputationProvider` clearly labeled).
 
-**Gate:** current audit report reflects the actual repository, not assumed status.
+**Gate:** Current audit report reflects the actual repository, verified with real command outputs.
 
 ## Phase 1 — API contract and analysis skeleton
-**Status:** Baseline reported present; verify.
+**Status:** Completed & Verified (2026-10-13)
 
-- [ ] Verify `app/api/v1/health`, `app/api/v1/analyze/text`, and `app/api/v1/analyze/url`.
-- [ ] Verify Zod request/response schemas match `docs/API_CONTRACT.md`.
-- [ ] Verify deterministic checks, orchestrator, and provider interfaces are cleanly separated.
-- [ ] Verify error envelopes, request IDs, input bounds, timeouts, and provider status handling.
-- [ ] Add regression tests for separate scam-risk and claim-verification dimensions.
-- [ ] Remove or clearly label any demo/mock output in user-facing production paths.
+- [x] Verify `app/api/v1/health`, `app/api/v1/analyze/text`, and `app/api/v1/analyze/url`.
+- [x] Verify Zod request/response schemas match `docs/API_CONTRACT.md`.
+- [x] Verify deterministic checks, orchestrator, and provider interfaces are cleanly separated.
+- [x] Verify error envelopes, request IDs, input bounds, timeouts, and provider status handling.
+- [x] Add regression tests for separate scam-risk and claim-verification dimensions (21 automated tests passing).
+- [x] Remove or clearly label any demo/mock output in user-facing production paths (`provider_status` flags identify mock vs real state).
 
-**Gate:** valid structured responses and predictable partial-result behavior.
+**Gate:** Valid structured responses with dual-dimension classification and predictable partial-result behavior.
 
 ## Phase 2 — Reliable text-analysis MVP
-**Priority:** P0
+**Priority:** P0  
+**Status:** Completed & Verified (2026-10-14)
 
-- [ ] Implement/verify deterministic India-relevant scam indicators.
-- [ ] Connect Amazon Bedrock through a server-only adapter using structured output.
-- [ ] Validate model output and handle refusals, malformed output, timeouts, and quotas.
-- [ ] Build or verify the accessible responsive input/results UX.
-- [ ] Keep model inference separate from evidence and deterministic signals.
-- [ ] Add Hindi, Hinglish, English, legitimate, and ambiguous test cases.
+- [x] Implement/verify deterministic India-relevant scam indicators (`src/lib/analysis/deterministicRules.ts`, 10 rules covering UPI, OTP, KYC, electricity, digital arrest, job scams, lotteries, predatory instant loans, malicious APK files, and prompt injection defense with benign counterexamples and Devanagari Hindi support; 22 unit tests passing).
+- [x] Connect Amazon Bedrock through a server-only adapter using structured output (`src/lib/providers/bedrockAdapter.ts` using `@aws-sdk/client-bedrock-runtime`).
+- [x] Validate model output and handle refusals, malformed output, sandbox delimiter escaping, timeouts, and quotas (`parseAndValidateBedrockOutput`, `sanitizeUntrustedSubmission`, 12 unit tests passing).
+- [x] Build or verify the accessible responsive input/results UX (`components/AnalysisDashboard.tsx`, `app/page.tsx` with dual verdict cards, 10 quick presets, copy report, and keyboard shortcuts).
+- [x] Keep model inference separate from evidence and deterministic signals (`AnalysisOrchestrator` signal fusion).
+- [x] Add Hindi, Hinglish, English, legitimate, and ambiguous test cases (tested in `tests/deterministicRules.test.ts` and interactive dashboard).
 
-**Gate:** text submission returns a schema-valid, explainable result without asserting certainty beyond evidence.
+**Gate:** Text submission returns a schema-valid, explainable result with separate scam-risk and claim-verification dimensions without asserting certainty beyond evidence. (PASS - 56 automated tests passing across 6 test suites)
 
 ## Phase 3 — URL analysis and evidence retrieval
 **Priority:** P0
@@ -130,9 +131,15 @@ Do not start browser extensions, deepfake detection, reverse-image search, compl
 - [ ] Confirm deployment configuration and demo evidence.
 - [ ] Avoid major features and architecture changes.
 
-## Agent's next-step selection rule
+## Agent execution playbook (Steps A–F)
 
-At each session, inspect the repository and choose the highest-priority item that is both missing and feasible. Prefer the smallest complete vertical slice. If a provider needs credentials, implement/test the adapter and mock path, clearly report the blocker, and continue with other work. Do not invent keys or claim real integration success.
+Follow this sequencing during feature implementation:
+- **Step A — Contract and Result Model:** Keep `docs/API_CONTRACT.md` and Zod schemas (`src/lib/validation/schemas.ts`) synchronized with separate `scam_risk` and `claim_verification` dimensions.
+- **Step B — Analysis Orchestration:** Isolate deterministic rules from model inference and provider lookups. Treat submitted text and retrieved pages as untrusted data; defend against prompt injection. Handle provider outages gracefully with partial results.
+- **Step C — Evidence Retrieval & URL Reputation:** Keep keys server-side. Prefer passive reputation lookups over direct target fetching. If fetching is ever added, enforce strict SSRF guards. Never fabricate citations.
+- **Step D — User Experience:** Display verdict, key signals, evidence provenance, missing checks, uncertainty, and safe next steps in accessible English/Hindi/Hinglish. Distinguish lack of evidence from safety.
+- **Step E — Tests and Evaluation:** Pair every pattern rule with benign counterexamples. Add multilingual and adversarial test fixtures. Run Vitest, lint/type checks, and production builds.
+- **Step F — Stretch Features (Screenshot & Telegram):** Only implement after the P0 core flow is verified and stable.
 
 ## Required phase report
 

@@ -33,7 +33,7 @@ describe('Route Handlers API Contract', () => {
     expect(data.error.message).toContain('Text cannot be empty');
   });
 
-  it('successfully analyzes valid text and returns schema-compliant response', async () => {
+  it('successfully analyzes valid text and returns schema-compliant response with dual classification', async () => {
     const req = new NextRequest('http://localhost:3000/api/v1/analyze/text', {
       method: 'POST',
       body: JSON.stringify({ text: 'Urgent: account suspended. Pay fee now.' }),
@@ -45,7 +45,11 @@ describe('Route Handlers API Contract', () => {
     const data = await res.json();
     expect(data.analysis_id).toBeDefined();
     expect(data.input_type).toBe('text');
-    expect(data.verdict).toBeDefined();
+    expect(data.classification).toBeDefined();
+    expect(data.classification.scam_risk).toBeDefined();
+    expect(data.classification.claim_verification).toBeDefined();
+    expect(data.classification.scam_risk.verdict).toBe('likely_scam');
+    expect(data.classification.claim_verification.verdict).toBe('unverified');
     expect(Array.isArray(data.reasons)).toBe(true);
     expect(data.provider_status).toBeDefined();
   });
@@ -63,7 +67,7 @@ describe('Route Handlers API Contract', () => {
     expect(data.error.code).toBe('INVALID_INPUT');
   });
 
-  it('successfully analyzes valid URL', async () => {
+  it('successfully analyzes valid URL and returns dual classification', async () => {
     const req = new NextRequest('http://localhost:3000/api/v1/analyze/url', {
       method: 'POST',
       body: JSON.stringify({ url: 'https://example.com' }),
@@ -74,6 +78,8 @@ describe('Route Handlers API Contract', () => {
 
     const data = await res.json();
     expect(data.input_type).toBe('url');
-    expect(data.verdict).toBe('no_obvious_risk_found');
+    expect(data.classification).toBeDefined();
+    expect(data.classification.scam_risk.verdict).toBe('no_obvious_risk_found');
+    expect(data.classification.claim_verification.verdict).toBe('unverified');
   });
 });

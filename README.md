@@ -8,13 +8,12 @@ SatyamAI is an advisory decision-support tool. It does not guarantee that a mess
 
 ## Read the docs in this order
 
-1. [`SOURCE_OF_TRUTH.md`](./SOURCE_OF_TRUTH.md) — authoritative product requirements, priorities, architecture, safety, and agent workflow.
-2. [`DEVELOPMENT_ROADMAP.md`](./DEVELOPMENT_ROADMAP.md) — phased next steps and acceptance gates.
-3. [`docs/COMPETITIVE_GAP_ANALYSIS.md`](./docs/COMPETITIVE_GAP_ANALYSIS.md) — differentiators, competitor-inspired gaps, and scope decisions.
-4. [`docs/AGENT_NEXT_STEPS.md`](./docs/AGENT_NEXT_STEPS.md) — actionable instructions for the coding agent.
-5. [`docs/API_CONTRACT.md`](./docs/API_CONTRACT.md) — expected endpoint and response behavior; synchronize with implemented Zod schemas.
-6. [`docs/TEST_PLAN.md`](./docs/TEST_PLAN.md) — test strategy, evaluation, and release gates.
-7. [`docs/DECISIONS.md`](./docs/DECISIONS.md) — architecture and product decisions.
+1. [`SOURCE_OF_TRUTH.md`](./SOURCE_OF_TRUTH.md) — canonical product specifications, competitive differentiation, safety, and agent workflow.
+2. [`DEVELOPMENT_ROADMAP.md`](./DEVELOPMENT_ROADMAP.md) — phased roadmap, verified release gates, and agent execution playbook.
+3. [`docs/API_CONTRACT.md`](./docs/API_CONTRACT.md) — authoritative endpoint and response schemas (Zod).
+4. [`docs/TEST_PLAN.md`](./docs/TEST_PLAN.md) — test strategy, evaluation fixtures, release gates, and feature traceability matrix (F1–F14).
+5. [`docs/DECISIONS.md`](./docs/DECISIONS.md) — Architecture and Product Decision Records (ADRs D-001 through D-012).
+6. [`docs/REPOSITORY_AUDIT.md`](./docs/REPOSITORY_AUDIT.md) — detailed repository audit, requirement-to-code traceability, and verification evidence.
 
 ## Architecture baseline
 

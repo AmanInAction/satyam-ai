@@ -85,9 +85,19 @@ Record material decisions so the solo developer and coding agent can understand 
 - **Decision:** If implemented, Telegram must reuse the same server-side analysis pipeline and safety rules.
 - **Gate:** Only after core web flow and release gates pass.
 
+## D-013 — Phase 2 Reliable Text-Analysis MVP & Bedrock Provider Adapter Architecture
+- **Date:** 2026-10-14
+- **Status:** Implemented and Verified
+- **Decision:** Implement a dual-verdict analysis pipeline combining India-specific deterministic rules (`src/lib/analysis/deterministicRules.ts`) with a server-only Amazon Bedrock provider adapter (`src/lib/providers/bedrockAdapter.ts`) and a resilient mock fallback (`MockLLMProvider`).
+- **Context:** Bedrock credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) may be unconfigured in certain dev/test environments. The system must not crash or fabricate certainty, but gracefully report provider status (`not_configured` or `failed`) while continuing to evaluate deterministic security rules.
+- **Safety Safeguards:**
+  1. User input within prompt templates is strictly encapsulated in `<untrusted_user_submission>` XML blocks, and all user tags attempting to break boundaries (`</untrusted_user_submission>`) are neutralized.
+  2. Structured JSON model outputs are strictly validated via Zod (`BedrockStructuredOutputSchema`).
+  3. Explicit model refusals and timeouts (AbortController) return safe, cautious `unverified` verdicts with honest limitation reporting.
+  4. 10 India-relevant deterministic rules with benign counterexamples cover UPI PIN traps, OTP theft, electricity cut threats, digital arrest, job scams, lotteries, predatory loans, malicious APK files, and prompt injection attempts, including Devanagari Hindi text matching.
+
 ## Pending verification
-- Actual Bedrock integration and chosen model/region.
-- Real evidence provider and URL reputation provider.
-- Screenshot/OCR implementation.
-- Current test count and build result after this documentation update.
-- Whether Telegram can fit without jeopardizing the submission target.
+- Real AWS Bedrock live API call with verified production credentials (credentials unconfigured in this container).
+- Real evidence provider and URL reputation provider (scheduled for Phase 3).
+- Screenshot/OCR implementation (deferred to Phase 5).
+- Telegram stretch channel (Phase 7 / Stretch).

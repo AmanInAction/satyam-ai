@@ -3,6 +3,7 @@ import {
   TextAnalysisRequestSchema,
   UrlAnalysisRequestSchema,
   AnalysisResponseSchema,
+  ClassificationSchema,
 } from '../src/lib/validation/schemas';
 
 describe('Validation Schemas', () => {
@@ -61,11 +62,50 @@ describe('Validation Schemas', () => {
     });
   });
 
+  describe('ClassificationSchema (Dual-Dimension)', () => {
+    it('supports separate scam_risk and claim_verification dimensions', () => {
+      const valid = {
+        scam_risk: {
+          verdict: 'likely_scam',
+          risk_level: 'high',
+        },
+        claim_verification: {
+          verdict: 'supported',
+        },
+      };
+      const res = ClassificationSchema.safeParse(valid);
+      expect(res.success).toBe(true);
+    });
+
+    it('rejects invalid claim verification verdict', () => {
+      const invalid = {
+        scam_risk: {
+          verdict: 'likely_scam',
+          risk_level: 'high',
+        },
+        claim_verification: {
+          verdict: 'invalid_label',
+        },
+      };
+      const res = ClassificationSchema.safeParse(invalid);
+      expect(res.success).toBe(false);
+    });
+  });
+
   describe('AnalysisResponseSchema', () => {
-    it('validates compliant response payload', () => {
+    it('validates compliant response payload with dual verdict classification', () => {
       const payload = {
         analysis_id: 'an_12345678',
         input_type: 'text' as const,
+        classification: {
+          scam_risk: {
+            verdict: 'likely_scam' as const,
+            risk_level: 'high' as const,
+          },
+          claim_verification: {
+            verdict: 'unverified' as const,
+          },
+        },
         verdict: 'likely_scam' as const,
         risk_level: 'high' as const,
         summary: 'Urgent payment scam detected.',
@@ -74,6 +114,8 @@ describe('Validation Schemas', () => {
             code: 'urgency_pressure',
             title: 'Urgency Pressure',
             explanation: 'Pressures user to act swiftly.',
+            signal_type: 'deterministic_rule',
+            evidence_refs: [],
           },
         ],
         evidence: [],
@@ -82,6 +124,7 @@ describe('Validation Schemas', () => {
         checks_performed: ['deterministic_rules', 'mock_llm'],
         provider_status: {
           llm: 'success' as const,
+          evidence: 'not_configured' as const,
           url_reputation: 'not_applicable' as const,
         },
         created_at: new Date().toISOString(),

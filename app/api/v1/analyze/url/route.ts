@@ -34,7 +34,25 @@ export async function POST(req: NextRequest) {
   try {
     const analysis = await defaultOrchestrator.analyzeUrl(parseResult.data.url);
     return NextResponse.json(analysis);
-  } catch {
+  } catch (err: unknown) {
+    const message = (err as Error)?.message || 'An unexpected error occurred while analyzing the URL.';
+    const isSsrf = message.includes('SSRF protection');
+    const isValidation =
+      isSsrf ||
+      message.includes('Unsupported protocol') ||
+      message.includes('Port ') ||
+      message.includes('URL exceeds') ||
+      message.includes('Invalid');
+
+    if (isValidation) {
+      return createErrorResponse(
+        400,
+        isSsrf ? 'SSRF_BLOCKED' : 'INVALID_INPUT',
+        message,
+        requestId
+      );
+    }
+
     return createErrorResponse(
       500,
       'INTERNAL_ERROR',

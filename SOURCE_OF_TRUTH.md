@@ -69,9 +69,27 @@ This is a decision-support tool—not an authority that can guarantee a message 
 - Custom model training.
 - Microservices or infrastructure added without demonstrated need.
 
-## 5. Differentiation requirements
+## 5. Market context and differentiation requirements
 
-These are product requirements to evaluate and implement incrementally; they are not claims that every competitor lacks the feature.
+These product requirements translate competitor research into actionable differentiators. They are not claims that every competitor lacks every feature.
+
+### Market Landscape & Positioning
+
+| Category / Product | Known Strength | SatyamAI Opportunity |
+|---|---|---|
+| AI Scam Checkers | Multi-format scam analysis | Stronger explicit evidence provenance, clear uncertainty, and separated claim verification |
+| India-Focused Checkers | Locally relevant scam scenarios (UPI, KYC) | Combine scam/security assessment with source-backed factual claim verification |
+| Truecaller Link Checker | URL reputation and reported threat domains | Assess the message/offer context as well as the destination URL |
+| Google Safe Browsing | Known dangerous website/phishing telemetry | Not a general-purpose factual claim verifier; provide context-aware risk analysis |
+| Google Fact Check Explorer | Database of published fact-check claims | Distinguish retrieval of existing fact checks from fresh heuristic analysis |
+| Alt News & BOOM | Investigative journalism and media context | Provide faster automated triage for personal messages/links while linking back to reporting |
+
+### Product Non-Goals
+- Do not claim SatyamAI is uniquely capable without rigorous testing.
+- Do not promise 100% scam detection or infallible truth verification.
+- Do not imply a low-risk result proves a sender or website is safe.
+- Do not authenticate payment screenshots or legal documents solely from visual appearance.
+- Do not add advanced forensics or user accounts before core analysis flows are rock-solid.
 
 ### D1. Unified multi-risk assessment
 Support a coherent flow for suspicious text, URLs, and eventually screenshots. Detect whether the content appears to involve fraud/security risk, a factual claim needing verification, both, or neither/insufficient context. Keep the resulting verdict dimensions separate.

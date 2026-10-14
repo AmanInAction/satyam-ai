@@ -12,27 +12,37 @@ export class MockLLMProvider implements ILLMProvider {
 
   async analyzeText(text: string): Promise<LLMAnalysisResult> {
     const lower = text.toLowerCase();
+    const isBenignOtpWarning =
+      /do not share|never share|not share with anyone|bank never calls/i.test(lower);
     const hasUrgency = /urgent|immediately|blocked|expires|within 24 hours/i.test(lower);
     const hasFinancial = /fee|pay|transfer|gift card|crypto|upi|bank account/i.test(lower);
-    const hasOtp = /otp|password|pin|credential|verification code/i.test(lower);
+    const hasOtpSolicitation =
+      (/otp|password|pin|credential|verification code/i.test(lower) &&
+        /share|send|tell|provide|verify with/i.test(lower) &&
+        !isBenignOtpWarning);
 
-    if (hasOtp || (hasUrgency && hasFinancial)) {
+    if (hasOtpSolicitation || (hasUrgency && hasFinancial && !isBenignOtpWarning)) {
       return {
         verdict: 'likely_scam',
         risk_level: 'high',
+        claim_verdict: 'unverified',
         summary: 'Message exhibits high-risk indicators of urgency pressure combined with payment or credential solicitation.',
         reasons: [
           {
             code: 'urgency_pressure',
             title: 'Urgency Pressure',
             explanation: 'Demands immediate action under threat of account loss or penalty.',
+            signal_type: 'deterministic_rule',
+            evidence_refs: [],
           },
-          ...(hasOtp
+          ...(hasOtpSolicitation
             ? [
                 {
                   code: 'credential_solicitation',
                   title: 'Credential or OTP Request',
                   explanation: 'Legitimate institutions never ask for your confidential password, PIN, or OTP.',
+                  signal_type: 'deterministic_rule',
+                  evidence_refs: [],
                 },
               ]
             : []),
@@ -53,12 +63,15 @@ export class MockLLMProvider implements ILLMProvider {
       return {
         verdict: 'suspicious',
         risk_level: 'medium',
+        claim_verdict: 'unverified',
         summary: 'Message contains potential risk cues that warrant caution before responding.',
         reasons: [
           {
             code: 'unsolicited_request',
             title: 'Unsolicited Alert',
             explanation: 'Contains unsolicited notices that mimic administrative or billing communications.',
+            signal_type: 'deterministic_rule',
+            evidence_refs: [],
           },
         ],
         recommended_actions: [
@@ -74,6 +87,7 @@ export class MockLLMProvider implements ILLMProvider {
     return {
       verdict: 'no_obvious_risk_found',
       risk_level: 'low',
+      claim_verdict: 'unverified',
       summary: 'No obvious scam patterns or high-risk cues detected in the submitted text.',
       reasons: [],
       recommended_actions: [

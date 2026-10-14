@@ -4,11 +4,13 @@ import {
   ProviderStatus,
   ScamVerdict,
   RiskLevel,
+  ClaimVerdict,
 } from '../validation/schemas';
 
 export interface LLMAnalysisResult {
   verdict: ScamVerdict;
   risk_level: RiskLevel;
+  claim_verdict?: ClaimVerdict;
   summary: string;
   reasons: ReasonItem[];
   recommended_actions: string[];

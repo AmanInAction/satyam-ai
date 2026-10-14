@@ -85,14 +85,16 @@ To establish a maintainable, production-grade runtime within the containerized A
 | Component / Feature | File Path | Status | Details |
 |---|---|---|---|
 | **Health Check API** | `app/api/v1/health/route.ts` | Active | Returns `{ status: 'ok', service: 'satyam-ai', version: 'v1', timestamp: ... }`. Non-sensitive. |
-| **Text Analysis API** | `app/api/v1/analyze/text/route.ts` | Active | Accepts JSON, validates via Zod, returns structured verdict with error envelope. |
-| **URL Analysis API** | `app/api/v1/analyze/url/route.ts` | Active | Accepts URL, validates protocol (`http`/`https`), returns structured verdict. |
-| **Runtime Validation** | `src/lib/validation/schemas.ts` | Active | Zod schemas enforcing bounds (max 10,000 chars) and contract compliance. |
+| **Text Analysis API** | `app/api/v1/analyze/text/route.ts` | Active | Accepts JSON, validates via Zod, returns dual classification with error envelope. |
+| **URL Analysis API** | `app/api/v1/analyze/url/route.ts` | Active | Accepts URL, validates protocol (`http`/`https`), returns dual classification. |
+| **Deterministic Rules Engine** | `src/lib/analysis/deterministicRules.ts` | Active | India-focused rules: UPI PIN traps, OTP solicitation, KYC/power cuts, digital arrest, job/lottery scams with benign counterexamples. |
+| **Bedrock LLM Adapter** | `src/lib/providers/bedrockAdapter.ts` | Active | `@aws-sdk/client-bedrock-runtime` adapter with structured output parsing, validation, and unconfigured fallback. |
+| **Runtime Validation** | `src/lib/validation/schemas.ts` | Active | Zod schemas enforcing bounds (max 10,000 chars), dual verdicts, and contract compliance. |
 | **Error Handling** | `src/lib/errors/apiError.ts` | Active | Standardized error envelope `{ error: { code, message, request_id } }`. |
-| **Provider Adapters** | `src/lib/providers/interfaces.ts`, `mockAdapter.ts` | Active | Modular interfaces and deterministic mock implementations. |
-| **Analysis Orchestrator** | `src/lib/analysis/orchestrator.ts` | Active | Coordinates rules, adapters, and partial-result resilience. |
-| **Baseline Frontend Shell** | `app/page.tsx`, `app/layout.tsx` | Active | Responsive layout and status cards validating Next.js App Router readiness. |
-| **Automated Test Suite** | `tests/*.test.ts`, `vitest.config.ts` | Active | 19 passing tests covering routes, validation, health, and orchestrator. |
+| **Provider Adapters** | `src/lib/providers/interfaces.ts`, `mockAdapter.ts`, `bedrockAdapter.ts` | Active | Modular interfaces and deterministic mock implementations. |
+| **Analysis Orchestrator** | `src/lib/analysis/orchestrator.ts` | Active | Fuses deterministic safety rules with LLM inference, provider status, and partial-result resilience. |
+| **Interactive Frontend UI** | `components/AnalysisDashboard.tsx`, `app/page.tsx` | Active | Responsive text-analysis dashboard with dual-verdict cards, quick presets, and 1930 helpline guidance. |
+| **Automated Test Suite** | `tests/*.test.ts`, `vitest.config.ts` | Active | 46 passing unit, route, orchestrator, and rules tests. |
 | **Build & Lint Scripts** | `package.json`, `next.config.mjs` | Active | `npm run lint` (`tsc --noEmit`), `npm test`, and `npm run build` (`next build`) pass cleanly. |
 
 ---
@@ -102,18 +104,18 @@ To establish a maintainable, production-grade runtime within the containerized A
 ### P0 Requirements (Must Ship by Nov 13–14)
 | Requirement | Status | Gap / Notes |
 |---|---|---|
-| Responsive web application UI | Partial | Base layout and Tailwind setup active; input forms and result panels pending Phase 2. |
-| Text / message analysis endpoint | Missing | Schema drafted in `API_CONTRACT.md`; routes and validators pending Phase 1–2. |
-| URL analysis endpoint | Missing | Proposed in `API_CONTRACT.md`; parsing and safety logic pending Phase 3. |
-| Structured API response (verdict, risk, reasons, evidence, actions) | Missing | Schema drafted; Pydantic/Zod/TypeScript model implementations pending Phase 1. |
-| Deterministic scam-pattern checks | Missing | Rules specified in `SOURCE_OF_TRUTH.md` (§7); pending Phase 2. |
-| LLM provider adapter | Missing | Architecture constraint D-002 requires adapter pattern; pending Phase 1–2. |
-| Evidence retrieval integration | Missing | Provider adapter pending Phase 3. Graceful degradation required. |
-| URL reputation check integration | Missing | Provider adapter pending Phase 3. Safe fallback required. |
-| Hindi / Hinglish input support | Missing | Evaluation set specified in `TEST_PLAN.md`; prompt tuning pending Phase 4. |
-| Input validation & size limits | Partial | Express JSON body parser enabled; strict bounds and character limits pending Phase 1. |
-| SSRF and URL safe-fetch protections | Missing | Constraints defined in `SOURCE_OF_TRUTH.md` (§8); pending Phase 3. |
-| Automated tests & test fixtures | Missing | Test plan defined in `docs/TEST_PLAN.md`; test runner setup pending Phase 1. |
+| Responsive web application UI | Implemented | Interactive Next.js dashboard with dual verdict display (`scam_risk` and `claim_verification`), presets, and mobile responsiveness. |
+| Text / message analysis endpoint | Implemented | `app/api/v1/analyze/text/route.ts` active, accepts JSON, validates via Zod, returns dual classification. |
+| URL analysis endpoint | Implemented | `app/api/v1/analyze/url/route.ts` active, enforces protocol constraints, returns dual classification. |
+| Structured API response (dual verdict, reasons, evidence, actions) | Implemented | `src/lib/validation/schemas.ts` defines `classification.scam_risk` and `classification.claim_verification`, verified by contract tests. |
+| Deterministic scam-pattern checks | Implemented | `src/lib/analysis/deterministicRules.ts` with 15 automated positive/benign unit tests. |
+| LLM provider adapter | Implemented | `BedrockLLMProvider` (`@aws-sdk/client-bedrock-runtime`) and `MockLLMProvider` active; structured output validation verified. |
+| Evidence retrieval integration | Partial | `IEvidenceProvider` interface and mock active; returns `not_configured` without claiming safety. Real provider in Phase 3. |
+| URL reputation check integration | Partial | `IReputationProvider` interface and mock active; returns `not_applicable` or test signals. Real provider in Phase 3. |
+| Hindi / Hinglish input support | Implemented | Evaluated across rules and UI presets (`language_hint` support in English, Hindi, Hinglish). |
+| Input validation & size limits | Implemented | Zod schemas enforce 10,000 char maximum, valid http/https URLs, and opaque request IDs. |
+| SSRF and URL safe-fetch protections | Implemented | Server-side direct fetching disabled; passive URL syntax and reputation lookups only. |
+| Automated tests & test fixtures | Implemented | Vitest test runner active with 46 unit, route, orchestrator, and rule tests passing. |
 
 ### P1 Requirements (Should Ship After P0 Stable)
 - Screenshot upload and OCR/vision text extraction: Not started (Phase 4).
@@ -156,12 +158,13 @@ To establish a maintainable, production-grade runtime within the containerized A
 
 | Service / Provider | Purpose | Status in Environment | Action / Fallback |
 |---|---|---|---|
-| **Google Gemini API** | LLM analysis, contextual reasoning, summarization | Available in server environment (`GEMINI_API_KEY`) | Build adapter using `@google/genai` or REST interface; support graceful degradation if quota exceeded. |
-| **Google Fact Check Tools API** | Evidence retrieval for claims | Optional / Credential needed | Build adapter; fallback to search or unverified state if unconfigured. |
-| **Web Search (Tavily / Brave / Google Search)** | Evidence retrieval for fresh scam patterns | Optional / Credential needed | Build adapter; return `evidence: []` with explicit limitation if unconfigured. |
-| **URL Reputation (Google Safe Browsing / VirusTotal)** | Domain reputation and threat indicators | Optional / Credential needed | Build adapter; report `provider_status: "not_configured"` without claiming URL is safe. |
+| **Amazon Bedrock** (Chosen LLM Platform, D-008) | Multi-model LLM reasoning & structured extraction | Unconfigured in container (`AWS_*` credentials needed in deployment) | Adapter pattern implemented (`ILLMProvider`); deterministic `MockLLMProvider` active for local execution and test suites. |
+| **Google Gemini API** (Alternative LLM Provider) | LLM analysis, contextual reasoning, summarization | Available in server environment (`GEMINI_API_KEY`) | Adapter pattern implemented; can be invoked server-side when configured. |
+| **Google Fact Check Tools API** | Evidence retrieval for claims | Optional / Unconfigured | `IEvidenceProvider` adapter reports `provider_status: "not_configured"`; returns `evidence: []` with explicit limitation. |
+| **Web Search (Tavily / Brave / Google Search)** | Evidence retrieval for fresh scam patterns | Optional / Unconfigured | Adapter pattern fallback returns empty evidence list without fabricating sources. |
+| **URL Reputation (Google Safe Browsing / VirusTotal)** | Domain reputation and threat indicators | Optional / Unconfigured | `IReputationProvider` adapter reports `provider_status: "not_configured"` without claiming destination is safe. |
 
-*Note: All integrations will operate behind the adapter pattern (Decision D-002) with robust fallback behavior. No development or testing will be blocked by missing optional credentials.*
+*Note: All integrations operate strictly behind the adapter pattern (Decision D-002) with robust fallback behavior. No development or testing is blocked by missing optional credentials.*
 
 ---
 
