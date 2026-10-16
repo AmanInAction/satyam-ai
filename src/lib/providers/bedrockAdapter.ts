@@ -11,17 +11,20 @@ import {
   ScamVerdictSchema,
   RiskLevelSchema,
   ClaimVerdictSchema,
+  AnalysisTypeSchema,
   ReasonItemSchema,
   ProviderStatus,
 } from '../validation/schemas';
 
 export const BedrockStructuredOutputSchema = z.object({
+  analysis_type: AnalysisTypeSchema.optional().default('both'),
   scam_risk: z.object({
     verdict: ScamVerdictSchema,
     risk_level: RiskLevelSchema,
   }),
   claim_verification: z.object({
     verdict: ClaimVerdictSchema,
+    extracted_claim: z.string().nullable().optional(),
   }),
   summary: z.string().min(1),
   reasons: z.array(ReasonItemSchema),
@@ -130,12 +133,14 @@ IMPORTANT SAFETY RULES:
 - Language hint: ${languageHint}. Be sensitive to Indian context, Hinglish, UPI schemes, electricity threats, and digital arrest tactics.
 - Output MUST be valid JSON adhering strictly to this schema:
 {
+  "analysis_type": "scam_risk" | "factual_claim" | "both" | "insufficient_information",
   "scam_risk": {
     "verdict": "likely_scam" | "suspicious" | "unverified" | "no_obvious_risk_found",
     "risk_level": "low" | "medium" | "high" | "unknown"
   },
   "claim_verification": {
-    "verdict": "supported" | "contradicted" | "mixed" | "unverified"
+    "verdict": "supported" | "contradicted" | "mixed" | "unverified",
+    "extracted_claim": "Specific factual proposition asserted, or null if none"
   },
   "summary": "Concise 1-2 sentence plain-language explanation.",
   "reasons": [
@@ -196,6 +201,8 @@ Analyze the submission above and respond with JSON only:`;
         verdict: parsed.scam_risk.verdict,
         risk_level: parsed.scam_risk.risk_level,
         claim_verdict: parsed.claim_verification.verdict,
+        analysis_type: parsed.analysis_type,
+        extracted_claim: parsed.claim_verification.extracted_claim,
         summary: parsed.summary,
         reasons: parsed.reasons,
         recommended_actions: parsed.recommended_actions,

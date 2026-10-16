@@ -397,6 +397,27 @@ export function evaluateDeterministicUrlSignals(parsedUrl: URL): UrlSignalEvalua
     });
   }
 
+  // 7. Phishing / Reward Lure in non-trusted domain or path
+  if (!isTrustedApex) {
+    const fullPathAndDomain = `${hostname}${parsedUrl.pathname}`.toLowerCase();
+    const hasPhishingLure =
+      /free-gift|gift-reward|free-reward|claim-reward|reward-claim|verify-login|login-verify|account-update|bank-secure|security-update|cashback-claim/i.test(
+        fullPathAndDomain
+      );
+
+    if (hasPhishingLure) {
+      matchedReasons.push({
+        code: 'flagged_domain',
+        title: 'Suspicious Domain / Phishing Lure',
+        explanation:
+          'The URL contains deceptive wording typical of credential-harvesting phishing kits or fraudulent reward campaigns.',
+        signal_type: 'deterministic_rule',
+        evidence_refs: [],
+      });
+      actions.push('Do not enter personal credentials or passwords on unsolicited reward or verification links.');
+    }
+  }
+
   let suggestedVerdict: ScamVerdict = 'no_obvious_risk_found';
   let suggestedRiskLevel: RiskLevel = 'low';
 
@@ -404,7 +425,8 @@ export function evaluateDeterministicUrlSignals(parsedUrl: URL): UrlSignalEvalua
     (r) =>
       r.code === 'ip_address_hostname' ||
       r.code === 'brand_impersonation_in_domain' ||
-      r.code === 'userinfo_in_url'
+      r.code === 'userinfo_in_url' ||
+      r.code === 'flagged_domain'
   );
 
   if (hasHighRiskReason) {

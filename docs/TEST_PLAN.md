@@ -127,20 +127,22 @@ Traceability matrix mapping core differentiators to repository files, tests, and
 
 | ID | Requirement | Acceptance Evidence & File Paths | Tests | Status |
 |---|---|---|---|---|
-| **F1** | Unified text/URL flow | `app/api/v1/analyze/text/route.ts`, `url/route.ts` | `tests/apiRoutes.test.ts` | **Implemented** |
-| **F2** | Separate scam-risk & claim verdicts | `src/lib/validation/schemas.ts` (`classification`) | `tests/validation.test.ts`, `tests/orchestrator.test.ts` | **Implemented** |
-| **F3** | Real evidence provenance | `src/lib/validation/schemas.ts` (`source_type`, `evidence_refs`) | `tests/validation.test.ts` | **Schema Implemented / Mock Provider** |
-| **F4** | Missing evidence is not safety | `src/lib/analysis/orchestrator.ts` (`unverified` defaults) | `tests/orchestrator.test.ts` | **Implemented** |
-| **F5** | India-aware scam indicators | `src/lib/analysis/deterministicRules.ts` (10 scam rules + benign counterexamples) | `tests/deterministicRules.test.ts` (22 tests) | **Implemented** |
-| **F6** | English/Hindi/Hinglish support | `src/lib/analysis/deterministicRules.ts` (Devanagari + Hinglish + English) | `tests/deterministicRules.test.ts`, `tests/validation.test.ts` | **Implemented** |
-| **F7** | Provider partial-result behavior | `src/lib/analysis/orchestrator.ts` (`faultyOrchestrator` test) | `tests/orchestrator.test.ts` | **Implemented** |
-| **F8** | Prompt-injection resistance | `src/lib/providers/bedrockAdapter.ts` (sandbox escaping neutralization) + Rule 10 | `tests/bedrockAdapter.test.ts`, `tests/deterministicRules.test.ts` | **Implemented** |
-| **F9** | SSRF safety if target fetching exists | `UrlAnalysisRequestSchema` protocol guards; passive lookup only | `tests/apiRoutes.test.ts` | **Implemented** (Direct fetching disabled) |
-| **F10**| Privacy by default | Zero persistent database storage; no raw body logging | Server config & routes | **Implemented** |
-| **F11**| False-pos / false-neg tracking | Evaluation dataset in test plan | `tests/*.test.ts` | **Partial** (Expanded in Phase 7) |
-| **F12**| Screenshot / OCR | Multipart upload, vision adapter | — | **Deferred (P1)** |
-| **F13**| Telegram bot | Reuses `/api/v1/analyze` pipeline | — | **Deferred (P2 / Stretch)** |
-| **F14**| Feedback / history | Data-minimized feedback schema | — | **Deferred (P1)** |
+| **F1** | Unified text/URL flow | `app/api/v1/analyze/text/route.ts`, `url/route.ts` | `tests/apiRoutes.test.ts` (8 tests) | **Implemented & Verified** |
+| **F2** | Separate scam-risk & claim verdicts | `src/lib/validation/schemas.ts` (`classification`) | `tests/validation.test.ts`, `tests/orchestrator.test.ts` | **Implemented & Verified** |
+| **F3** | Real evidence provenance | `src/lib/providers/evidenceProvider.ts` (`WikipediaEvidenceProvider` live attributable citations + `GoogleFactCheckProvider`) | `tests/evidenceProvider.test.ts` (4 tests) | **Implemented & Verified (Real Live Provider)** |
+| **F4** | Missing evidence is not safety | `src/lib/analysis/orchestrator.ts` (`unverified` defaults) | `tests/orchestrator.test.ts` (5 tests) | **Implemented & Verified** |
+| **F5** | India-aware scam indicators | `src/lib/analysis/deterministicRules.ts` (10 scam rules + benign counterexamples) | `tests/deterministicRules.test.ts` (22 tests) | **Implemented & Verified** |
+| **F6** | English/Hindi/Hinglish support | `src/lib/analysis/deterministicRules.ts` (Devanagari + Hinglish + English) | `tests/deterministicRules.test.ts`, `tests/validation.test.ts` | **Implemented & Verified** |
+| **F7** | Provider partial-result behavior | `src/lib/analysis/orchestrator.ts` (`CompositeReputationProvider`, `CompositeEvidenceProvider`) | `tests/orchestrator.test.ts`, `tests/evidenceProvider.test.ts` | **Implemented & Verified** |
+| **F8** | Prompt-injection resistance | `src/lib/providers/bedrockAdapter.ts` (sandbox escaping neutralization) + Rule 10 | `tests/bedrockAdapter.test.ts` (12 tests), `tests/deterministicRules.test.ts` | **Implemented & Verified** |
+| **F9** | SSRF safety & URL normalization | `src/lib/security/urlSecurity.ts` (Loopback, private IPv4/IPv6, link-local, cloud metadata, port checks) | `tests/urlSecurity.test.ts` (23 tests) | **Implemented & Verified** (Passive lookups only) |
+| **F10**| Real URL reputation provider | `src/lib/providers/reputationProvider.ts` (`CloudflareDnsReputationProvider` live DNS threat feed + `GoogleSafeBrowsingProvider`) | `tests/reputationProvider.test.ts` (5 tests) | **Implemented & Verified (Real Live Provider)** |
+| **F11**| Grounded claim extraction & verification | `src/lib/analysis/claimExtractor.ts`, `src/lib/analysis/evidenceEvaluator.ts` (detects analysis type, extracts propositions, scores relevance, enforces verdict discipline) | `tests/claimVerification.test.ts` (15 tests) | **Implemented & Verified** |
+| **F12**| Privacy by default | Zero persistent database storage; no raw body logging | Server config & routes | **Implemented & Verified** |
+| **F13**| False-pos / false-neg tracking | Evaluation dataset in test plan | `tests/*.test.ts` (106 automated tests passing) | **In Progress (Phase 7)** |
+| **F14**| Screenshot / OCR | Multipart upload, vision adapter | — | **Deferred (Phase 5 - P1)** |
+| **F15**| Telegram bot | Reuses `/api/v1/analyze` pipeline | — | **Deferred (Phase 8 - P2 / Stretch)** |
+| **F16**| Feedback / history | Data-minimized feedback schema | — | **Deferred (Phase 8 - P1)** |
 
 ## Test report format
 

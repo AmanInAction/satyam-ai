@@ -5,12 +5,17 @@ import {
   ScamVerdict,
   RiskLevel,
   ClaimVerdict,
+  AnalysisType,
+  VerificationSource,
 } from '../validation/schemas';
 
 export interface LLMAnalysisResult {
   verdict: ScamVerdict;
   risk_level: RiskLevel;
   claim_verdict?: ClaimVerdict;
+  analysis_type?: AnalysisType;
+  extracted_claim?: string | null;
+  verification_source?: VerificationSource;
   summary: string;
   reasons: ReasonItem[];
   recommended_actions: string[];
@@ -29,6 +34,14 @@ export interface ReputationResult {
   status: ProviderStatus;
 }
 
+export interface VisionOcrResult {
+  extractedText: string;
+  confidence?: number;
+  status: ProviderStatus;
+  detectedLanguage?: string;
+  isSensitiveContent?: boolean;
+}
+
 export interface ILLMProvider {
   name: string;
   analyzeText(text: string, languageHint?: string): Promise<LLMAnalysisResult>;
@@ -42,4 +55,9 @@ export interface IEvidenceProvider {
 export interface IReputationProvider {
   name: string;
   checkUrl(url: string): Promise<ReputationResult>;
+}
+
+export interface IVisionOcrProvider {
+  name: string;
+  extractText(imageBuffer: Buffer, mimeType: string): Promise<VisionOcrResult>;
 }

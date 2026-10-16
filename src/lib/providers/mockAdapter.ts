@@ -6,11 +6,13 @@ import {
   EvidenceSearchResult,
   ReputationResult,
 } from './interfaces';
+import { identifyAnalysisTypeAndClaim } from '../analysis/claimExtractor';
 
 export class MockLLMProvider implements ILLMProvider {
   name = 'mock_llm';
 
   async analyzeText(text: string): Promise<LLMAnalysisResult> {
+    const claimAnalysis = identifyAnalysisTypeAndClaim(text);
     const lower = text.toLowerCase();
     const isBenignOtpWarning =
       /do not share|never share|not share with anyone|bank never calls/i.test(lower);
@@ -26,6 +28,8 @@ export class MockLLMProvider implements ILLMProvider {
         verdict: 'likely_scam',
         risk_level: 'high',
         claim_verdict: 'unverified',
+        analysis_type: claimAnalysis.hasFactualAssertion ? 'both' : 'scam_risk',
+        extracted_claim: claimAnalysis.extractedClaim,
         summary: 'Message exhibits high-risk indicators of urgency pressure combined with payment or credential solicitation.',
         reasons: [
           {
@@ -64,6 +68,8 @@ export class MockLLMProvider implements ILLMProvider {
         verdict: 'suspicious',
         risk_level: 'medium',
         claim_verdict: 'unverified',
+        analysis_type: claimAnalysis.hasFactualAssertion ? 'both' : 'scam_risk',
+        extracted_claim: claimAnalysis.extractedClaim,
         summary: 'Message contains potential risk cues that warrant caution before responding.',
         reasons: [
           {
@@ -84,11 +90,20 @@ export class MockLLMProvider implements ILLMProvider {
       };
     }
 
+    const defaultAnalysisType = claimAnalysis.analysisType;
+
     return {
       verdict: 'no_obvious_risk_found',
       risk_level: 'low',
       claim_verdict: 'unverified',
-      summary: 'No obvious scam patterns or high-risk cues detected in the submitted text.',
+      analysis_type: defaultAnalysisType,
+      extracted_claim: claimAnalysis.extractedClaim,
+      summary:
+        defaultAnalysisType === 'insufficient_information'
+          ? 'Submission lacks sufficient factual context or verifiable propositions.'
+          : defaultAnalysisType === 'factual_claim'
+          ? 'No obvious scam patterns detected; factual assertions require independent verification against sources.'
+          : 'No obvious scam patterns or high-risk cues detected in the submitted text.',
       reasons: [],
       recommended_actions: [
         'Remain vigilant even when obvious risks are not identified.',

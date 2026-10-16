@@ -48,29 +48,32 @@ The migration report says the repository was moved to a full-stack Next.js App R
 **Gate:** Text submission returns a schema-valid, explainable result with separate scam-risk and claim-verification dimensions without asserting certainty beyond evidence. (PASS - 56 automated tests passing across 6 test suites)
 
 ## Phase 3 — URL analysis and evidence retrieval
-**Priority:** P0
+**Priority:** P0  
+**Status:** Completed & Verified (2026-10-15)
 
-- [ ] Verify safe URL parsing and normalization.
-- [ ] Integrate at least one real URL-reputation provider when credentials/access are available.
-- [ ] Integrate a real fact-check/search provider behind an adapter.
-- [ ] Display source title, publisher/domain, URL, and relevance.
-- [ ] Add source provenance/type where practical.
-- [ ] Handle provider outage, empty result, and conflicting signals distinctly.
-- [ ] Test URL abuse and SSRF controls if any server-side target fetching exists.
+- [x] Verify safe URL parsing, normalization, and SSRF controls (`src/lib/security/urlSecurity.ts`, 23 unit tests covering loopback, private IPv4/IPv6, link-local, cloud metadata, obfuscated IPs, and unsafe ports).
+- [x] Integrate at least one real URL-reputation provider (`CloudflareDnsReputationProvider` live DNS threat feed + `GoogleSafeBrowsingProvider` adapter).
+- [x] Integrate a real fact-check/search provider behind an adapter (`WikipediaEvidenceProvider` live attributable citation engine + `GoogleFactCheckProvider` adapter).
+- [x] Display source title, publisher/domain, URL, and relevance (`components/AnalysisDashboard.tsx` with dedicated URL inspection tab and evidence citation cards).
+- [x] Add source provenance/type where practical (`source_type`: `encyclopedic_reference` / `fact_check_organization`).
+- [x] Handle provider outage, empty result, and conflicting signals distinctly (`CompositeReputationProvider` and `CompositeEvidenceProvider` fallback gracefully without fabricating safety).
+- [x] Test URL abuse and SSRF controls with passive analysis (server never fetches or executes destination targets directly).
 
-**Gate:** no fabricated reputation or evidence; missing data is not treated as safe.
+**Gate:** no fabricated reputation or evidence; missing data is not treated as safe. (PASS - 91 automated tests passing across 9 test suites)
 
 ## Phase 4 — Unified scam + misinformation assessment
-**Priority:** P0 product behavior; build on Phases 2–3
+**Priority:** P0 product behavior; build on Phases 2–3  
+**Status:** Completed & Verified (2026-10-16)
 
-- [ ] Detect whether submission contains a fraud/security risk, a factual claim, both, or insufficient context.
-- [ ] Return separate scam/security and claim-verification fields.
-- [ ] Add claim extraction and evidence retrieval for factual assertions.
-- [ ] Use `supported`, `contradicted`, `mixed`, or `unverified` only when evidence supports the label.
-- [ ] Explain when the system found an existing fact-check versus when it generated an evidence-limited analysis.
-- [ ] Test claims with supporting, contradicting, mixed, and absent evidence.
+- [x] Detect whether submission contains a fraud/security risk, a factual claim, both, or insufficient context (`src/lib/analysis/claimExtractor.ts` identifying `scam_risk`, `factual_claim`, `both`, and `insufficient_information`).
+- [x] Return separate scam/security and claim-verification fields (Zod schema with `classification.scam_risk`, `classification.claim_verification`, `analysis_type`, and `extracted_claim`).
+- [x] Add claim extraction and evidence retrieval for factual assertions (`identifyAnalysisTypeAndClaim` extracts clean factual propositions, omitting questions, subjective opinions, imperatives, and chatter; precision keyword queries generated for retrieval).
+- [x] Use `supported`, `contradicted`, `mixed`, or `unverified` only when evidence supports the label (`src/lib/analysis/evidenceEvaluator.ts` enforcing strict verdict discipline; missing or inconclusive evidence defaults to `unverified`).
+- [x] Explain when the system found an existing fact-check versus when it generated an evidence-limited analysis (`verification_source`: `fact_check_database`, `encyclopedic_reference`, `reputation_feed`, or `evidence_limited_inference`).
+- [x] Test claims with supporting, contradicting, mixed, and absent evidence (`tests/claimVerification.test.ts`, 15 unit and integration tests).
+- [x] Filter out irrelevant search citations (e.g. discarding generic Wikipedia articles like airline codes for banking URLs).
 
-**Gate:** claim accuracy and scam risk are never collapsed into one ambiguous verdict.
+**Gate:** claim accuracy and scam risk are never collapsed into one ambiguous verdict. (PASS - 106 automated tests passing across 10 test suites)
 
 ## Phase 5 — Screenshot input and regional UX
 **Priority:** P1, promote only if core is stable

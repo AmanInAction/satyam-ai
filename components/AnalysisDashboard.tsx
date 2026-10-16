@@ -25,8 +25,22 @@ import {
   BookCheck,
   Globe,
   FileText,
+  Target,
+  FileQuestion,
+  Scale,
+  Upload,
+  Image as ImageIcon,
+  FileSearch,
+  Edit3,
+  Eye,
 } from 'lucide-react';
-import { AnalysisResponse, ScamVerdict, ClaimVerdict, RiskLevel } from '../src/lib/validation/schemas';
+import {
+  AnalysisResponse,
+  ScamVerdict,
+  ClaimVerdict,
+  RiskLevel,
+  AnalysisType,
+} from '../src/lib/validation/schemas';
 
 interface PresetScenario {
   id: string;
@@ -125,6 +139,38 @@ const PRESET_SCENARIOS: PresetScenario[] = [
     languageHint: 'en',
     text: 'Government has announced that starting next week, all citizen electricity bills under 300 units are completely free across all states under a new national energy decree.',
   },
+  {
+    id: 'debunked_currency_ban',
+    label: 'Debunked 500 Note Ban Claim',
+    category: 'Misinformation',
+    badge: 'Contradicted Claim',
+    languageHint: 'en',
+    text: 'RBI has announced that 500 rupee currency notes will be completely banned and demonetized from December 2026. Exchange old notes immediately.',
+  },
+  {
+    id: 'dual_scam_scheme',
+    label: 'Dual Scam + Fake Scheme Lure',
+    category: 'Dual Risk',
+    badge: 'Scam + Fake Claim',
+    languageHint: 'en',
+    text: 'Government has announced free laptops under PM Yuva Scheme for all students. Pay Rs 150 processing fee via UPI to claim your laptop immediately at bit.ly/pm-laptop-scheme.',
+  },
+  {
+    id: 'benign_space_mission',
+    label: 'Confirmed Space Mission Claim',
+    category: 'Factual Claim',
+    badge: 'Supported Claim',
+    languageHint: 'en',
+    text: 'ISRO successfully launched and landed Chandrayaan-3 mission near lunar south pole on the moon.',
+  },
+  {
+    id: 'conversational_greeting',
+    label: 'Conversational Greeting',
+    category: 'Insufficient Context',
+    badge: 'No Verifiable Claim',
+    languageHint: 'en',
+    text: 'Hello good morning! Hope you are having a wonderful and productive day.',
+  },
 ];
 
 const URL_PRESETS: UrlPreset[] = [
@@ -160,10 +206,78 @@ const URL_PRESETS: UrlPreset[] = [
   },
 ];
 
+interface ScreenshotPreset {
+  id: string;
+  label: string;
+  badge: string;
+  mockText: string;
+  languageHint: 'auto' | 'en' | 'hi' | 'hinglish';
+  description: string;
+}
+
+const SCREENSHOT_PRESETS: ScreenshotPreset[] = [
+  {
+    id: 'sbi_kyc_img',
+    label: 'SBI Yono Block Notice',
+    badge: 'Phishing Threat',
+    languageHint: 'en',
+    description: 'Fake banking security SMS warning of blocked account with urgent link.',
+    mockText: 'SBI Alert: Dear Customer, your SBI YONO account has been blocked due to pending KYC update. Click here to verify immediately: https://sbi-kyc-update.xyz/login',
+  },
+  {
+    id: 'pm_laptop_img',
+    label: 'PM Yuva Free Laptop',
+    badge: 'Dual Threat Scheme',
+    languageHint: 'en',
+    description: 'Fake government laptop scheme with fee registration via UPI.',
+    mockText: 'Government has announced free laptops under PM Yuva Scheme for all college students. Pay Rs 200 registration fee via UPI to claim immediately at bit.ly/pm-laptop.',
+  },
+  {
+    id: 'hindi_bijli_img',
+    label: 'बिजली बिल डिस्कनेक्ट नोटिस',
+    badge: 'Hindi Threat',
+    languageHint: 'hi',
+    description: 'Devanagari Hindi threat of power disconnection tonight with officer number.',
+    mockText: 'प्रिय उपभोक्ता, आपकी बिजली का पावर आज रात 9:30 बजे काट दिया जाएगा क्योंकि आपका बिल अपडेट नहीं हुआ है। तुरंत बिजली अधिकारी से 9876543210 पर संपर्क करें।',
+  },
+  {
+    id: 'unreadable_blurry_img',
+    label: 'Blurry / Unreadable Image',
+    badge: 'Uncertainty / Blurry',
+    languageHint: 'auto',
+    description: 'Completely unreadable image demonstrating safe unverified uncertainty handling.',
+    mockText: '[UNREADABLE]',
+  },
+];
+
+function makePresetPngBlob(text: string): Blob {
+  const signature = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const ihdr = new Uint8Array([
+    0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x00, 0x64,
+    0x08, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+  ]);
+  const idat = new Uint8Array([
+    0x00, 0x00, 0x00, 0x0a, 0x49, 0x44, 0x41, 0x54,
+    0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01,
+    0x00, 0x00, 0x00, 0x00
+  ]);
+  const iend = new Uint8Array([
+    0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82
+  ]);
+  const padding = new Uint8Array(80);
+  const tag = new TextEncoder().encode(`\nMOCK_OCR:${text}`);
+  return new Blob([signature, ihdr, idat, padding, iend, tag], { type: 'image/png' });
+}
+
 export default function AnalysisDashboard() {
-  const [activeTab, setActiveTab] = useState<'text' | 'url'>('text');
+  const [activeTab, setActiveTab] = useState<'text' | 'url' | 'image'>('text');
   const [inputText, setInputText] = useState('');
   const [inputUrl, setInputUrl] = useState('');
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [extractedReviewText, setExtractedReviewText] = useState<string>('');
+  const [isEditingExtractedText, setIsEditingExtractedText] = useState(false);
   const [languageHint, setLanguageHint] = useState<'auto' | 'en' | 'hi' | 'hinglish'>('auto');
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<AnalysisResponse | null>(null);
@@ -181,9 +295,41 @@ export default function AnalysisDashboard() {
     setErrorMessage(null);
   };
 
+  const handleSelectScreenshotPreset = (preset: ScreenshotPreset) => {
+    const blob = makePresetPngBlob(preset.mockText);
+    const file = new File([blob], `${preset.id}.png`, { type: 'image/png' });
+    setSelectedImageFile(file);
+    setImagePreviewUrl(URL.createObjectURL(blob));
+    setLanguageHint(preset.languageHint);
+    setExtractedReviewText(preset.mockText === '[UNREADABLE]' ? '' : preset.mockText);
+    setErrorMessage(null);
+  };
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMessage('Image file exceeds the 5 MB limit. Please select a smaller screenshot.');
+      return;
+    }
+
+    setSelectedImageFile(file);
+    setImagePreviewUrl(URL.createObjectURL(file));
+    setExtractedReviewText('');
+    setErrorMessage(null);
+  };
+
   const handleClear = () => {
     setInputText('');
     setInputUrl('');
+    setSelectedImageFile(null);
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl);
+      setImagePreviewUrl(null);
+    }
+    setExtractedReviewText('');
+    setIsEditingExtractedText(false);
     setResult(null);
     setErrorMessage(null);
     setCopied(false);
@@ -194,9 +340,16 @@ export default function AnalysisDashboard() {
     const scamVerdict = result.classification?.scam_risk?.verdict ?? result.verdict ?? 'unverified';
     const scamRisk = result.classification?.scam_risk?.risk_level ?? result.risk_level ?? 'unknown';
     const claimVerdict = result.classification?.claim_verification?.verdict ?? 'unverified';
+    const analysisType = result.classification?.analysis_type || result.analysis_type || 'both';
+    const extractedClaim = result.classification?.claim_verification?.extracted_claim || result.extracted_claim || 'None detected';
+    const verSource = result.classification?.claim_verification?.verification_source || 'unverified';
 
     const textToCopy = `SatyamAI Analysis Report [${result.analysis_id}]
 Input Type: ${result.input_type.toUpperCase()}
+Analysis Category: ${analysisType.toUpperCase()}
+Extracted Claim: ${extractedClaim}
+Claim Verification Source: ${verSource.toUpperCase()}
+
 Scam & Fraud Risk: ${scamVerdict.toUpperCase()} (Risk Level: ${scamRisk.toUpperCase()})
 Claim Verification: ${claimVerdict.toUpperCase()}
 
@@ -204,7 +357,7 @@ Summary:
 ${result.summary}
 
 Evidence Citations (${result.evidence?.length || 0}):
-${result.evidence?.map((e) => `- [${e.publisher}] ${e.title}: ${e.url}`).join('\n') || 'None'}
+${result.evidence?.map((e) => `- [${e.publisher}] ${e.title}: ${e.url} (Finding: ${e.verification_finding || 'context'})`).join('\n') || 'None'}
 
 Recommended Actions:
 ${result.recommended_actions?.map((a) => `- ${a}`).join('\n') || 'None'}
@@ -286,6 +439,87 @@ Helpline (India): 1930 | cybercrime.gov.in`;
       setResult(data as AnalysisResponse);
     } catch {
       setErrorMessage('Network connection error. Please ensure the server is active.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAnalyzeImage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!selectedImageFile) {
+      setErrorMessage('Please select or upload a screenshot file to inspect.');
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedImageFile);
+      formData.append('language_hint', languageHint);
+
+      const response = await fetch('/api/v1/analyze/image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setErrorMessage(data?.error?.message || 'Failed to analyze screenshot. Please try again.');
+        setIsLoading(false);
+        return;
+      }
+
+      setResult(data as AnalysisResponse);
+      setExtractedReviewText(data.extracted_text || '');
+      setIsEditingExtractedText(false);
+    } catch {
+      setErrorMessage('Network connection error. Please ensure the server is active.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleReanalyzeEditedText = async () => {
+    if (!extractedReviewText.trim()) {
+      setErrorMessage('Extracted text cannot be empty.');
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch('/api/v1/analyze/text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: extractedReviewText.trim(),
+          language_hint: languageHint,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setErrorMessage(data?.error?.message || 'Failed to re-analyze refined text.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Preserve image input_type and attach refined text
+      const updatedResponse: AnalysisResponse = {
+        ...(data as AnalysisResponse),
+        input_type: 'image',
+        extracted_text: extractedReviewText.trim(),
+      };
+
+      setResult(updatedResponse);
+      setIsEditingExtractedText(false);
+    } catch {
+      setErrorMessage('Network connection error while re-evaluating refined text.');
     } finally {
       setIsLoading(false);
     }
@@ -373,6 +607,40 @@ Helpline (India): 1930 | cybercrime.gov.in`;
     }
   };
 
+  const getAnalysisTypeConfig = (type: AnalysisType | undefined) => {
+    switch (type) {
+      case 'both':
+        return {
+          title: 'Dual Assessment: Fraud Risk + Factual Claim',
+          desc: 'Submission combines identifiable scam/financial solicitation cues with a verifiable factual assertion.',
+          badgeBg: 'bg-purple-500/10 border-purple-500/30 text-purple-400',
+          icon: <Scale className="w-4 h-4 text-purple-400" />,
+        };
+      case 'scam_risk':
+        return {
+          title: 'Scam & Security Risk Assessment',
+          desc: 'Primary threat is financial fraud, credential theft, extortion, or deceptive solicitation.',
+          badgeBg: 'bg-rose-500/10 border-rose-500/30 text-rose-400',
+          icon: <ShieldAlert className="w-4 h-4 text-rose-400" />,
+        };
+      case 'factual_claim':
+        return {
+          title: 'Factual Claim Verification',
+          desc: 'Evaluates empirical factual assertions regarding government policy, public figures, science, or events.',
+          badgeBg: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
+          icon: <Target className="w-4 h-4 text-blue-400" />,
+        };
+      case 'insufficient_information':
+      default:
+        return {
+          title: 'Insufficient Context / Conversational',
+          desc: 'Submission lacks sufficient context, declarative propositions, or verifiable claims to assess.',
+          badgeBg: 'bg-slate-800 border-slate-700 text-slate-400',
+          icon: <FileQuestion className="w-4 h-4 text-slate-400" />,
+        };
+    }
+  };
+
   return (
     <div className="space-y-8">
       {/* Mode Switch Tabs */}
@@ -407,6 +675,22 @@ Helpline (India): 1930 | cybercrime.gov.in`;
         >
           <Globe className="w-3.5 h-3.5" />
           <span>Analyze Link / URL</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('image');
+            setErrorMessage(null);
+          }}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition ${
+            activeTab === 'image'
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+          }`}
+        >
+          <ImageIcon className="w-3.5 h-3.5" />
+          <span>Inspect Screenshot / OCR</span>
         </button>
       </div>
 
@@ -527,7 +811,7 @@ Helpline (India): 1930 | cybercrime.gov.in`;
               </div>
             </form>
           </div>
-        ) : (
+        ) : activeTab === 'url' ? (
           <div>
             <div className="mb-4">
               <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
@@ -620,6 +904,153 @@ Helpline (India): 1930 | cybercrime.gov.in`;
               </div>
             </form>
           </div>
+        ) : (
+          <div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+                  <ImageIcon className="w-5 h-5 text-blue-400" />
+                  Inspect a Screenshot or Notice Image
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Upload an SMS screenshot, WhatsApp forward, bank notice, or circular to extract visible text and assess security risks.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label htmlFor="image_language_select" className="text-xs text-slate-400 font-medium">
+                  Language:
+                </label>
+                <select
+                  id="image_language_select"
+                  value={languageHint}
+                  onChange={(e) => setLanguageHint(e.target.value as any)}
+                  className="bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="auto">Auto-Detect</option>
+                  <option value="en">English</option>
+                  <option value="hi">हिन्दी (Hindi)</option>
+                  <option value="hinglish">Hinglish</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Screenshot Preset Chips */}
+            <div className="mb-4">
+              <p className="text-xs text-slate-400 font-medium mb-2 flex items-center gap-1.5">
+                <Flame className="w-3.5 h-3.5 text-amber-400" />
+                Sample test screenshots:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {SCREENSHOT_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => handleSelectScreenshotPreset(preset)}
+                    className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-950/60 hover:bg-slate-800 text-slate-300 hover:text-white transition flex items-center gap-1.5"
+                  >
+                    <span>{preset.label}</span>
+                    <span className="text-[10px] px-1 rounded bg-slate-800 text-slate-400">
+                      {preset.badge}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Screenshot Upload Form */}
+            <form onSubmit={handleAnalyzeImage} className="space-y-4">
+              <div className="relative rounded-2xl border-2 border-dashed border-slate-800 bg-slate-950/40 p-6 text-center hover:border-blue-500/50 transition">
+                <input
+                  type="file"
+                  id="screenshot_upload"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={handleImageFileChange}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+
+                {imagePreviewUrl ? (
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                    <img
+                      src={imagePreviewUrl}
+                      alt="Selected screenshot preview"
+                      className="w-32 h-24 object-cover rounded-xl border border-slate-700 shadow-md bg-slate-900"
+                    />
+                    <div className="text-left space-y-1">
+                      <p className="text-sm font-semibold text-slate-200">
+                        {selectedImageFile?.name || 'Screenshot ready'}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {selectedImageFile
+                          ? `${Math.round(selectedImageFile.size / 1024)} KB`
+                          : 'Sample screenshot generated'}
+                      </p>
+                      <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-mono">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Ready to extract text
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center gap-2 py-4">
+                    <div className="w-12 h-12 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                      <Upload className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-200">
+                        Drop screenshot here, or <span className="text-blue-400 font-semibold underline">browse</span>
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        PNG, JPEG, WebP up to 5 MB (Minimum 50x50px)
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between text-xs text-slate-500 px-1">
+                <span>Magic bytes &amp; dimension boundary protection active</span>
+                <span>Document authenticity disclaimer: OCR transcribes text only</span>
+              </div>
+
+              {errorMessage && (
+                <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{errorMessage}</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-2">
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  disabled={isLoading || (!selectedImageFile && !result)}
+                  className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition disabled:opacity-40 flex items-center gap-1.5"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Clear
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isLoading || !selectedImageFile}
+                  className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-600/20 flex items-center gap-2"
+                >
+                  {isLoading ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Extracting &amp; analyzing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Extract &amp; Analyze</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
         )}
       </div>
 
@@ -649,6 +1080,146 @@ Helpline (India): 1930 | cybercrime.gov.in`;
               )}
             </button>
           </div>
+
+          {/* Extracted Screenshot Text & User Review Panel */}
+          {result.input_type === 'image' && (
+            <div className="p-5 rounded-2xl border border-blue-500/30 bg-blue-950/20 shadow-lg space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-blue-500/20 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400">
+                    <FileSearch className="w-4 h-4" />
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-100">
+                      OCR Extracted Screenshot Content
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      Transcribed optical characters from uploaded image. Review for accuracy before acting.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-mono text-slate-400 px-2 py-0.5 rounded bg-slate-900 border border-slate-800">
+                    {extractedReviewText?.length || 0} chars
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingExtractedText(!isEditingExtractedText)}
+                    className="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 transition flex items-center gap-1.5"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>{isEditingExtractedText ? 'Close Editor' : 'Edit & Refine'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {isEditingExtractedText ? (
+                <div className="space-y-2">
+                  <p className="text-[11px] text-amber-400">
+                    Correct any misread characters, names, or numbers below, then click Re-Analyze:
+                  </p>
+                  <textarea
+                    value={extractedReviewText}
+                    onChange={(e) => setExtractedReviewText(e.target.value)}
+                    rows={4}
+                    className="w-full rounded-xl border border-blue-500/40 bg-slate-950 p-3 text-xs text-slate-100 font-mono focus:outline-none focus:border-blue-400"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExtractedReviewText(result.extracted_text || '');
+                        setIsEditingExtractedText(false);
+                      }}
+                      className="px-3 py-1 rounded-lg border border-slate-800 bg-slate-900 text-xs text-slate-400 hover:text-slate-200"
+                    >
+                      Reset
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleReanalyzeEditedText}
+                      disabled={isLoading || !extractedReviewText.trim()}
+                      className="px-3.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow flex items-center gap-1"
+                    >
+                      {isLoading ? 'Re-evaluating...' : 'Re-Analyze Refined Text'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/70">
+                  {extractedReviewText ? (
+                    <p className="text-xs text-slate-200 font-mono leading-relaxed whitespace-pre-wrap">
+                      {extractedReviewText}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-slate-500 italic">
+                      [No readable textual characters detected by OCR in this screenshot]
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Sensitive Cues Warning */}
+              {result.recommended_actions?.some(
+                (a) =>
+                  a.toLowerCase().includes('sensitive') ||
+                  a.toLowerCase().includes('cvv') ||
+                  a.toLowerCase().includes('password')
+              ) && (
+                <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-950/20 text-amber-400 text-xs flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>
+                    Sensitive Data Detected: Never upload or share screenshots showing unmasked bank card numbers, CVVs, or account passwords.
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Unified Analysis Category & Extracted Claim Panel */}
+          {(() => {
+            const detectedType = result.classification?.analysis_type || result.analysis_type || 'both';
+            const typeCfg = getAnalysisTypeConfig(detectedType);
+            const extractedClaim = result.classification?.claim_verification?.extracted_claim || result.extracted_claim;
+            const verSource = result.classification?.claim_verification?.verification_source || 'unverified';
+
+            return (
+              <div className="p-5 rounded-2xl border border-slate-800 bg-slate-900/70 shadow-lg space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                      Detected Analysis Type:
+                    </span>
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border flex items-center gap-1.5 ${typeCfg.badgeBg}`}>
+                      {typeCfg.icon}
+                      <span>{typeCfg.title}</span>
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-500 font-mono">
+                    Provenance: <span className="text-slate-300 capitalize">{verSource.replace(/_/g, ' ')}</span>
+                  </span>
+                </div>
+
+                {extractedClaim ? (
+                  <div className="p-3.5 rounded-xl border border-slate-800/80 bg-slate-950/70">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400 block mb-1 flex items-center gap-1">
+                      <Target className="w-3.5 h-3.5" />
+                      Extracted Factual Assertion
+                    </span>
+                    <p className="text-xs text-slate-200 font-medium leading-relaxed italic">
+                      &ldquo;{extractedClaim}&rdquo;
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl border border-slate-800/50 bg-slate-950/40 text-[11px] text-slate-500 italic flex items-center gap-2">
+                    <FileQuestion className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                    <span>No standalone factual proposition detected (submission contains procedural instructions, subjective opinion, question, or scam solicitation only).</span>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Dual Verdict Banner Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -749,11 +1320,31 @@ Helpline (India): 1930 | cybercrime.gov.in`;
               <div className="space-y-3">
                 {result.evidence.map((ev, idx) => (
                   <div key={idx} className="p-4 rounded-xl border border-slate-800 bg-slate-950/60 flex flex-col gap-2">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
                       <span className="text-xs font-semibold text-slate-200">{ev.title}</span>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0 w-fit">
-                        {ev.source_type || 'reference'}
-                      </span>
+                      <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                        {ev.relevance_score !== undefined && (
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            {Math.round(ev.relevance_score * 100)}% Match
+                          </span>
+                        )}
+                        {ev.verification_finding && ev.verification_finding !== 'neutral' && (
+                          <span
+                            className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                              ev.verification_finding === 'contradicts'
+                                ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                                : ev.verification_finding === 'supports'
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                                : 'bg-slate-800 text-slate-400 border-slate-700'
+                            }`}
+                          >
+                            {ev.verification_finding === 'contradicts' ? 'Refutes Claim' : 'Corroborates Claim'}
+                          </span>
+                        )}
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0">
+                          {ev.source_type?.replace(/_/g, ' ') || 'reference'}
+                        </span>
+                      </div>
                     </div>
                     <p className="text-xs text-slate-400 leading-relaxed">{ev.relevance}</p>
                     <div className="flex items-center justify-between pt-2 border-t border-slate-900 text-[11px]">

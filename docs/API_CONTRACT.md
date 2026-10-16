@@ -64,54 +64,69 @@ Illustrative shape only; exact field names/enums must match current Zod schemas.
 
 ```json
 {
-  "analysis_id": "opaque-id",
+  "analysis_id": "an_73b26be02e6c0ca8",
   "input_type": "text",
+  "analysis_type": "both",
+  "extracted_claim": "Government announced free laptops under PM Yuva Scheme for all students.",
   "classification": {
+    "analysis_type": "both",
     "scam_risk": {
-      "verdict": "suspicious",
-      "risk_level": "medium"
+      "verdict": "likely_scam",
+      "risk_level": "high"
     },
     "claim_verification": {
-      "verdict": "unverified"
+      "verdict": "contradicted",
+      "extracted_claim": "Government announced free laptops under PM Yuva Scheme for all students.",
+      "verification_source": "fact_check_database"
     }
   },
-  "summary": "The message creates urgency and requests an unusual payment.",
+  "summary": "Dual threat detected: Exhibits scam indicators (Urgency Pressure) while asserting factual claim \"Government announced free laptops under PM Yuva Scheme for all students.\". Claim is evaluated as CONTRADICTED.",
   "reasons": [
     {
       "code": "urgency_pressure",
-      "title": "Urgency pressure",
-      "explanation": "The message pressures the recipient to act immediately.",
+      "title": "Urgency Pressure",
+      "explanation": "Demands immediate action under threat of penalty or fee loss.",
       "signal_type": "deterministic_rule",
       "evidence_refs": []
+    },
+    {
+      "code": "claim_contradicted",
+      "title": "Claim Verification: CONTRADICTED",
+      "explanation": "Independent fact-check records and official releases contradict or refute this claim.",
+      "signal_type": "fact_check_database",
+      "evidence_refs": ["https://factcheck.pib.gov.in/free-laptop-scam"]
     }
   ],
   "evidence": [
     {
-      "title": "Real source title",
-      "publisher": "Publisher or official organization",
-      "url": "https://example.org/reference",
-      "relevance": "Explains the reported scam pattern.",
-      "source_type": "official_or_fact_check"
+      "title": "Fact Check: Government is NOT giving free laptops under Yuva Scheme",
+      "publisher": "PIB Fact Check",
+      "url": "https://factcheck.pib.gov.in/free-laptop-scam",
+      "relevance": "PIB Fact Check warns that messages promising free laptops are fake and a front for UPI fee fraud.",
+      "source_type": "fact_check_organization",
+      "relevance_score": 0.85,
+      "verification_finding": "contradicts"
     }
   ],
   "recommended_actions": [
-    "Do not send money or share OTPs/PINs until independently verified.",
-    "Contact the organization through its official website or app."
+    "Do not send money, UPI PINs, or personal details to register for unverified schemes.",
+    "Verify official government schemes only via official .gov.in or .nic.in portals."
   ],
   "limitations": [
-    "The sender's identity was not independently verified."
+    "Heuristic analysis based on pattern recognition; verify independently with official sources."
   ],
   "checks_performed": [
-    "deterministic_text_rules",
-    "llm_analysis",
-    "evidence_search"
+    "claim_extractor",
+    "deterministic_rules",
+    "amazon_bedrock",
+    "composite_evidence"
   ],
   "provider_status": {
     "llm": "success",
-    "evidence_search": "partial",
+    "evidence": "success",
     "url_reputation": "not_applicable"
   },
-  "created_at": "2026-10-13T12:00:00Z"
+  "created_at": "2026-10-16T12:00:00Z"
 }
 ```
 

@@ -81,5 +81,49 @@ describe('Route Handlers API Contract', () => {
     expect(data.classification).toBeDefined();
     expect(data.classification.scam_risk.verdict).toBe('no_obvious_risk_found');
     expect(data.classification.claim_verification.verdict).toBe('unverified');
+    expect(Array.isArray(data.evidence)).toBe(true);
+    expect(data.checks_performed).toContain('url_normalization_ssrf_guard');
+  });
+
+  it('rejects SSRF loopback address with 400 and SSRF_BLOCKED code', async () => {
+    const req = new NextRequest('http://localhost:3000/api/v1/analyze/url', {
+      method: 'POST',
+      body: JSON.stringify({ url: 'http://127.0.0.1:8080/admin' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const res = await handleUrlAnalyze(req);
+    expect(res.status).toBe(400);
+
+    const data = await res.json();
+    expect(data.error.code).toBe('SSRF_BLOCKED');
+    expect(data.error.message).toContain('SSRF protection');
+  });
+
+  it('rejects cloud metadata IP address with 400 and SSRF_BLOCKED code', async () => {
+    const req = new NextRequest('http://localhost:3000/api/v1/analyze/url', {
+      method: 'POST',
+      body: JSON.stringify({ url: 'http://169.254.169.254/latest/meta-data' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const res = await handleUrlAnalyze(req);
+    expect(res.status).toBe(400);
+
+    const data = await res.json();
+    expect(data.error.code).toBe('SSRF_BLOCKED');
+  });
+
+  it('identifies deceptive brand spoofing URL as likely_scam via API', async () => {
+    const req = new NextRequest('http://localhost:3000/api/v1/analyze/url', {
+      method: 'POST',
+      body: JSON.stringify({ url: 'http://sbi-yono-update.top/login' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const res = await handleUrlAnalyze(req);
+    expect(res.status).toBe(200);
+
+    const data = await res.json();
+    expect(data.classification.scam_risk.verdict).toBe('likely_scam');
+    expect(data.classification.scam_risk.risk_level).toBe('high');
+    expect(data.reasons.some((r: any) => r.code === 'brand_impersonation_in_domain')).toBe(true);
   });
 });

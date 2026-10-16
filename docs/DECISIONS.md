@@ -96,8 +96,31 @@ Record material decisions so the solo developer and coding agent can understand 
   3. Explicit model refusals and timeouts (AbortController) return safe, cautious `unverified` verdicts with honest limitation reporting.
   4. 10 India-relevant deterministic rules with benign counterexamples cover UPI PIN traps, OTP theft, electricity cut threats, digital arrest, job scams, lotteries, predatory loans, malicious APK files, and prompt injection attempts, including Devanagari Hindi text matching.
 
+## D-014 — Phase 3 URL Analysis, SSRF Protections, and Real Evidence/Reputation Provider Architecture
+- **Date:** 2026-10-15
+- **Status:** Implemented and Verified
+- **Decision:** Implement safe URL normalization, comprehensive SSRF protection controls, and live external intelligence providers behind modular adapters:
+  1. `WikipediaEvidenceProvider` (`src/lib/providers/evidenceProvider.ts`): Live, keyless attributable citation retrieval engine using Wikipedia search APIs, returning source title, publisher, and canonical URL.
+  2. `CloudflareDnsReputationProvider` (`src/lib/providers/reputationProvider.ts`): Live DNS-over-HTTPS (1.1.1.2) network threat lookup checking for domain sinkholing without exposing or calling target URLs directly.
+  3. `GoogleFactCheckProvider` and `GoogleSafeBrowsingProvider`: Server-only adapters supporting Google Fact Check Tools API and Google Safe Browsing v4 with graceful fallback when unconfigured.
+  4. `validateAndNormalizeUrl` (`src/lib/security/urlSecurity.ts`): Strict SSRF firewall blocking loopback (127.0.0.0/8, ::1), private subnets (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, fc00::/7), link-local/cloud metadata (169.254.169.254, metadata.google.internal), non-standard ports, and obfuscated integer/hex representations.
+- **Context:** Preventing SSRF while retrieving real, traceable evidence and reputation signals without ever fetching or executing untrusted destination web pages on the application server.
+
+## D-015 — Phase 4 Unified Scam + Misinformation Assessment Architecture
+- **Date:** 2026-10-16
+- **Status:** Implemented and Verified
+- **Decision:** Implement a unified analysis pipeline that evaluates submissions across two orthogonal dimensions without collapsing them into an ambiguous score:
+  1. **Analysis-Type Identification (`src/lib/analysis/claimExtractor.ts`):** Classifies inputs into `scam_risk`, `factual_claim`, `both` (e.g. fraudulent schemes using fake government policies as bait), or `insufficient_information`.
+  2. **Claim Extraction:** Extracts clean, declarative factual assertions while strictly excluding questions, imperative instructions, subjective opinions, and conversational banter. Precision keyword queries are generated for evidence retrieval.
+  3. **Evidence Relevance Scoring & Quality Filtering (`src/lib/analysis/evidenceEvaluator.ts`):** Scores candidate citations against target queries and claims. Irrelevant search results (such as unrelated Wikipedia articles for banking URLs) are filtered out, avoiding misleading citations.
+  4. **Strict Verdict Discipline:** Employs `supported`, `contradicted`, `mixed`, or `unverified` strictly when substantiated by relevant evidence. An absence or failure of evidence defaults to `unverified` with explicit disclosures; missing data is never equated to safety or truth.
+  5. **Provenance Transparency:** Distinguishes between `fact_check_database`, `encyclopedic_reference`, `reputation_feed`, and `evidence_limited_inference`.
+- **Trade-off:** Requires separate classification objects and UI panels, but provides users with complete clarity on why a message is risky and whether its claims are factual.
+
 ## Pending verification
-- Real AWS Bedrock live API call with verified production credentials (credentials unconfigured in this container).
-- Real evidence provider and URL reputation provider (scheduled for Phase 3).
+- Real AWS Bedrock live API call with verified production credentials (credentials unconfigured in this container; verified mock fallback).
+- Google Fact Check Tools API and Google Safe Browsing API keys (optional key-based providers; live Cloudflare Security DNS and Wikipedia Search operate out-of-the-box).
 - Screenshot/OCR implementation (deferred to Phase 5).
-- Telegram stretch channel (Phase 7 / Stretch).
+- Telegram stretch channel (Phase 8 / Stretch).
+
+
