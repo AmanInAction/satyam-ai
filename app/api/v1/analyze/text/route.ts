@@ -2,9 +2,27 @@ import { NextRequest, NextResponse } from 'next/server';
 import { TextAnalysisRequestSchema } from '@/src/lib/validation/schemas';
 import { createErrorResponse, generateRequestId } from '@/src/lib/errors/apiError';
 import { defaultOrchestrator } from '@/src/lib/analysis/orchestrator';
+import { defaultRateLimiter } from '@/src/lib/security/rateLimiter';
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+    },
+  });
+}
 
 export async function POST(req: NextRequest) {
   const requestId = generateRequestId();
+
+  // Rate Limiting Check
+  const rateLimitCheck = defaultRateLimiter.handleRateLimit(req);
+  if (rateLimitCheck.isRateLimited && rateLimitCheck.response) {
+    return rateLimitCheck.response;
+  }
 
   let body: unknown;
   try {
@@ -36,7 +54,13 @@ export async function POST(req: NextRequest) {
       parseResult.data.text,
       parseResult.data.language_hint
     );
-    return NextResponse.json(analysis);
+    const response = NextResponse.json(analysis);
+    if (rateLimitCheck.headers) {
+      for (const [key, val] of Object.entries(rateLimitCheck.headers)) {
+        response.headers.set(key, val);
+      }
+    }
+    return response;
   } catch {
     return createErrorResponse(
       500,

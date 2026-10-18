@@ -44,6 +44,7 @@ export interface VisionOcrResult {
 
 export interface ILLMProvider {
   name: string;
+  isConfigured?(): boolean;
   analyzeText(text: string, languageHint?: string): Promise<LLMAnalysisResult>;
 }
 

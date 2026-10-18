@@ -68,9 +68,9 @@ export class BedrockLLMProvider implements ILLMProvider {
       config.timeoutMs ||
       (process.env.BEDROCK_TIMEOUT_MS ? parseInt(process.env.BEDROCK_TIMEOUT_MS, 10) : 10000);
 
-    const accessKeyId = config.accessKeyId || process.env.AWS_ACCESS_KEY_ID;
-    const secretAccessKey = config.secretAccessKey || process.env.AWS_SECRET_ACCESS_KEY;
-    const sessionToken = config.sessionToken || process.env.AWS_SESSION_TOKEN;
+    const accessKeyId = config.accessKeyId !== undefined ? config.accessKeyId : process.env.AWS_ACCESS_KEY_ID;
+    const secretAccessKey = config.secretAccessKey !== undefined ? config.secretAccessKey : process.env.AWS_SECRET_ACCESS_KEY;
+    const sessionToken = config.sessionToken !== undefined ? config.sessionToken : process.env.AWS_SESSION_TOKEN;
 
     // In AWS IAM, permanent keys (starting with AKIA) do not accept session tokens.
     // Temporary STS credentials (starting with ASIA) require session tokens.

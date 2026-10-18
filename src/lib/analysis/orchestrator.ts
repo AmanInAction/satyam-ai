@@ -64,8 +64,9 @@ export class AnalysisOrchestrator {
       this.llm = options.llmProvider;
     } else {
       const bedrock = new BedrockLLMProvider();
-      // If Bedrock credentials are provided in the environment, use Bedrock; otherwise use MockLLMProvider for offline reliability
-      this.llm = bedrock.isConfigured() ? bedrock : new MockLLMProvider();
+      // If Bedrock credentials are provided in the environment, use Bedrock; in vitest automated suites, default to MockLLMProvider to prevent remote timeouts
+      const useBedrock = !process.env.VITEST && bedrock.isConfigured();
+      this.llm = useBedrock ? bedrock : new MockLLMProvider();
     }
     this.evidence = options.evidenceProvider ?? new CompositeEvidenceProvider();
     this.reputation = options.reputationProvider ?? new CompositeReputationProvider();
