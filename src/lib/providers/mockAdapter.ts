@@ -17,13 +17,15 @@ export class MockLLMProvider implements ILLMProvider {
     const isBenignOtpWarning =
       /do not share|never share|not share with anyone|bank never calls/i.test(lower);
     const hasUrgency = /urgent|immediately|blocked|expires|within 24 hours/i.test(lower);
-    const hasFinancial = /fee|pay|transfer|gift card|crypto|upi|bank account/i.test(lower);
+    const hasFinancial = /fee|pay|transfer|gift card|crypto|upi|bank account|registration fee|kyc|yono/i.test(lower);
+    const hasDisconnectionThreat = /disconnect|disconnected|disconnection|power will be cut|काट दी जाएगी|काट दिया जाएगा/i.test(lower) && /electricity|power|bijli|bijlee|बिजली|call officer|officer|\b\d{10}\b/i.test(lower);
+    const hasSchemeFee = /government|govt|pm |scheme|yojana/i.test(lower) && /fee|pay|upi/i.test(lower);
     const hasOtpSolicitation =
       (/otp|password|pin|credential|verification code/i.test(lower) &&
         /share|send|tell|provide|verify with/i.test(lower) &&
         !isBenignOtpWarning);
 
-    if (hasOtpSolicitation || (hasUrgency && hasFinancial && !isBenignOtpWarning)) {
+    if (hasOtpSolicitation || hasDisconnectionThreat || hasSchemeFee || (hasUrgency && hasFinancial && !isBenignOtpWarning)) {
       return {
         verdict: 'likely_scam',
         risk_level: 'high',

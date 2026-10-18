@@ -72,6 +72,11 @@ export class BedrockLLMProvider implements ILLMProvider {
     const secretAccessKey = config.secretAccessKey || process.env.AWS_SECRET_ACCESS_KEY;
     const sessionToken = config.sessionToken || process.env.AWS_SESSION_TOKEN;
 
+    // In AWS IAM, permanent keys (starting with AKIA) do not accept session tokens.
+    // Temporary STS credentials (starting with ASIA) require session tokens.
+    const shouldUseSessionToken =
+      Boolean(sessionToken) && (!accessKeyId || !accessKeyId.startsWith('AKIA'));
+
     if (config.client) {
       this.client = config.client;
       this.isConfiguredState = true;
@@ -81,7 +86,7 @@ export class BedrockLLMProvider implements ILLMProvider {
         credentials: {
           accessKeyId,
           secretAccessKey,
-          ...(sessionToken ? { sessionToken } : {}),
+          ...(shouldUseSessionToken ? { sessionToken } : {}),
         },
       });
       this.isConfiguredState = true;
@@ -168,8 +173,11 @@ Analyze the submission above and respond with JSON only:`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
 
+    const fallbackModel = 'meta.llama3-70b-instruct-v1:0';
+    let outputText: string | undefined;
+
     try {
-      const command = new ConverseCommand({
+      let command = new ConverseCommand({
         modelId: this.modelId,
         messages: [
           {
@@ -184,13 +192,43 @@ Analyze the submission above and respond with JSON only:`;
         },
       });
 
-      const response = await this.client.send(command, {
-        abortSignal: controller.signal,
-      });
+      try {
+        const response = await this.client.send(command, {
+          abortSignal: controller.signal,
+        });
+        outputText = response.output?.message?.content?.[0]?.text;
+      } catch (primaryErr: any) {
+        const msg = primaryErr?.message || '';
+        const isLegacyOrUnsubmitted =
+          primaryErr?.name === 'ResourceNotFoundException' ||
+          /legacy|use case details|not actively using/i.test(msg);
+
+        if (isLegacyOrUnsubmitted && this.modelId !== fallbackModel) {
+          command = new ConverseCommand({
+            modelId: fallbackModel,
+            messages: [
+              {
+                role: 'user',
+                content: [{ text: userMessage }],
+              },
+            ],
+            system: [{ text: systemPrompt }],
+            inferenceConfig: {
+              maxTokens: 1000,
+              temperature: 0.1,
+            },
+          });
+          const fallbackResponse = await this.client.send(command, {
+            abortSignal: controller.signal,
+          });
+          outputText = fallbackResponse.output?.message?.content?.[0]?.text;
+        } else {
+          throw primaryErr;
+        }
+      }
 
       clearTimeout(timeout);
 
-      const outputText = response.output?.message?.content?.[0]?.text;
       if (!outputText) {
         throw new Error('Empty text content returned by Amazon Bedrock');
       }

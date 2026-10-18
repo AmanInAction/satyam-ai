@@ -218,7 +218,8 @@ export class AnalysisOrchestrator {
     if (finalAnalysisType === 'both') {
       const scamCue = ruleResult.matchedReasons[0]?.title || 'Financial or credential risk';
       if (isHindi) {
-        summary = `द्विआयामी जोखिम (Dual Threat): संदेश में वित्तीय या क्रेडेंशियल जोखिम (${scamCue}) के लक्षण हैं और साथ ही यह दावा किया गया है: "${claimAnalysis.extractedClaim}"। दावे का सत्यापन: ${claimVerdict === 'contradicted' ? 'खंडित (CONTRADICTED)' : claimVerdict === 'supported' ? 'समर्थित (SUPPORTED)' : 'अपुष्ट (UNVERIFIED)'}।`;
+        const riskLabel = scamRiskLevel === 'high' ? 'उच्च जोखिम' : 'मध्यम जोखिम';
+        summary = `द्विआयामी जोखिम (Dual Threat): संदेश में ${riskLabel} वाली वित्तीय या क्रेडेंशियल धोखाधड़ी (${scamCue}) के लक्षण हैं और साथ ही यह दावा किया गया है: "${claimAnalysis.extractedClaim}"। दावे का सत्यापन: ${claimVerdict === 'contradicted' ? 'खंडित (CONTRADICTED)' : claimVerdict === 'supported' ? 'समर्थित (SUPPORTED)' : 'अपुष्ट (UNVERIFIED)'}।`;
       } else if (isHinglish) {
         summary = `Dual threat detect hua hai: Message me scam cues (${scamCue}) hain aur sath me factual claim assert kiya gaya hai: "${claimAnalysis.extractedClaim}". Claim status: ${claimVerdict.toUpperCase()}.`;
       } else {

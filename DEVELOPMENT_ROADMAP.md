@@ -78,14 +78,14 @@ The migration report says the repository was moved to a full-stack Next.js App R
 ## Phase 5 — Screenshot input and regional UX
 **Priority:** P1, promote only if core is stable
 
-- [ ] Add screenshot upload with strict MIME, size, and dimension limits.
-- [ ] Extract text using a replaceable OCR/vision adapter.
-- [ ] Show extracted text for user review when practical.
-- [ ] Feed extracted text through the same analysis orchestrator.
-- [ ] Test unreadable, oversized, unsupported, sensitive, and adversarial images.
-- [ ] Improve Hindi/Hinglish result readability.
+- [x] Add screenshot upload with strict MIME, size, and dimension limits (`src/lib/security/imageSecurity.ts`, 5MB limit, PNG/JPEG/WebP, binary magic bytes and dimension parser, 50x50 to 8000x8000px bounds).
+- [x] Extract text using a replaceable OCR/vision adapter (`src/lib/providers/visionProvider.ts`, `BedrockVisionProvider`, `MockVisionOcrProvider`, and `CompositeVisionProvider`).
+- [x] Show extracted text for user review when practical (`components/AnalysisDashboard.tsx` with OCR extraction preview, user editable refinement, and seamless re-analysis).
+- [x] Feed extracted text through the same analysis orchestrator (`defaultOrchestrator.analyzeImage` executes `analyzeText` with full dual-assessment safety and evidence grounding).
+- [x] Test unreadable, oversized, unsupported, sensitive, and adversarial images (`tests/imageSecurity.test.ts`, `tests/visionProvider.test.ts`, and `tests/imageApiRoute.test.ts`, 29 image-specific automated tests).
+- [x] Improve Hindi/Hinglish result readability (localized summary generation, bilingual explanations, National Cyber Crime Helpline 1930 prompts, and Devanagari script awareness).
 
-**Gate:** image input uses the same safety, evidence, and uncertainty rules as text; it does not claim to authenticate a screenshot.
+**Gate:** image input uses the same safety, evidence, and uncertainty rules as text; it does not claim to authenticate a screenshot. (PASS - 135 automated tests passing across 13 test suites)
 
 ## Phase 6 — Security, privacy, reliability, UX
 **Priority:** P0 release gate

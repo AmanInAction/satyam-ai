@@ -96,36 +96,40 @@ To establish a maintainable, production-grade runtime within the containerized A
 | **Error Handling** | `src/lib/errors/apiError.ts` | Active | Standardized error envelope `{ error: { code, message, request_id } }`. |
 | **Provider Adapters** | `src/lib/providers/interfaces.ts`, `mockAdapter.ts`, `bedrockAdapter.ts` | Active | Modular interfaces and composite fallback adapters. |
 | **Claim Extractor & Evaluator** | `src/lib/analysis/claimExtractor.ts`, `evidenceEvaluator.ts` | Active | Classifies analysis types (`scam_risk`, `factual_claim`, `both`, `insufficient_information`), extracts factual assertions, scores evidence relevance, filters irrelevant citations, and enforces grounded verdict discipline. |
-| **Analysis Orchestrator** | `src/lib/analysis/orchestrator.ts` | Active | Fuses deterministic safety rules with LLM inference, reputation feed, evidence retrieval, provider status, claim extraction/verification, and partial-result resilience. |
-| **Interactive Frontend UI** | `components/AnalysisDashboard.tsx`, `app/page.tsx` | Active | Responsive dual-tab (Text & URL) analysis dashboard with dual-verdict cards, detected analysis type, extracted claim badge, quick presets, evidence cards, copy report, and 1930 helpline guidance. |
-| **Automated Test Suite** | `tests/*.test.ts`, `vitest.config.ts` | Active | 106 passing unit, route, orchestrator, evidence, reputation, SSRF, claim verification, and rules tests across 10 suites. |
+| **Image Security & Dimension Guard** | `src/lib/security/imageSecurity.ts` | Active | Enforces 5MB size limit, container magic byte signatures (PNG, JPEG, WebP), binary dimension parsing (50x50 to 8000x8000 px), and sensitive credential detection (CVV, 16-digit card numbers, passwords). |
+| **Vision OCR Adapters** | `src/lib/providers/visionProvider.ts` | Active | `BedrockVisionProvider` (Claude 3 Haiku vision via `@aws-sdk/client-bedrock-runtime`), `MockVisionOcrProvider`, and `CompositeVisionProvider` for robust fallback. |
+| **Screenshot Analysis Endpoint** | `app/api/v1/analyze/image/route.ts` | Active | Accepts `multipart/form-data` and `application/json` base64 uploads, validates security controls, extracts text, and evaluates through the dual orchestrator pipeline. |
+| **Analysis Orchestrator** | `src/lib/analysis/orchestrator.ts` | Active | Fuses deterministic safety rules with LLM inference, reputation feed, evidence retrieval, provider status, claim extraction/verification, screenshot analysis, and partial-result resilience. |
+| **Interactive Frontend UI** | `components/AnalysisDashboard.tsx`, `app/page.tsx` | Active | Responsive tri-tab (Text, URL, Screenshot) analysis dashboard with dual-verdict cards, detected analysis type, extracted claim badge, OCR preview/refinement editor, sample presets, evidence cards, copy report, and 1930 helpline guidance. |
+| **Automated Test Suite** | `tests/*.test.ts`, `vitest.config.ts` | Active | 135 passing unit, route, orchestrator, evidence, reputation, SSRF, claim verification, rules, image security, vision provider, and screenshot API route tests across 13 suites. |
 | **Build & Lint Scripts** | `package.json`, `next.config.mjs` | Active | `npm run lint` (`tsc --noEmit`), `npm test`, and `npm run build` (`next build`) pass cleanly. |
 
 ---
 
 ## 3. Requirements Comparison (Implemented vs Partial vs Missing)
 
-### P0 Requirements (Must Ship by Nov 13–14)
+### P0 & P1 Requirements
 | Requirement | Status | Gap / Notes |
 |---|---|---|
-| Responsive web application UI | Implemented | Interactive Next.js dashboard with dual verdict display (`scam_risk` and `claim_verification`), analysis type badge, extracted claim callout, Text & URL inspection tabs, presets, evidence citation cards, and mobile responsiveness. |
+| Responsive web application UI | Implemented | Interactive Next.js dashboard with dual verdict display (`scam_risk` and `claim_verification`), analysis type badge, extracted claim callout, Text, URL, and Screenshot inspection tabs, presets, OCR review & refinement, evidence citation cards, and mobile responsiveness. |
 | Text / message analysis endpoint | Implemented | `app/api/v1/analyze/text/route.ts` active, accepts JSON, validates via Zod, returns dual classification. |
 | URL analysis endpoint | Implemented | `app/api/v1/analyze/url/route.ts` active, enforces SSRF and protocol constraints, runs reputation lookups, returns dual classification. |
+| Screenshot / OCR analysis endpoint | Implemented | `app/api/v1/analyze/image/route.ts` active, accepts multipart form data and base64 JSON, validates MIME, magic bytes, dimensions, extracts OCR text, provides sensitive data warning, and feeds to orchestrator. |
 | Structured API response (dual verdict, reasons, evidence, actions) | Implemented | `src/lib/validation/schemas.ts` defines `classification.scam_risk` and `classification.claim_verification`, verified by contract tests. |
-| Deterministic scam-pattern checks | Implemented | `src/lib/analysis/deterministicRules.ts` with 22 automated positive/benign unit tests covering 10 India-specific patterns and Devanagari script. |
+| Deterministic scam-pattern checks | Implemented | `src/lib/analysis/deterministicRules.ts` with 22 automated positive/benign unit tests covering 11 India-specific patterns and Devanagari script. |
 | LLM provider adapter | Implemented | `BedrockLLMProvider` (`@aws-sdk/client-bedrock-runtime`) and `MockLLMProvider` active; structured output validation verified. |
 | Evidence retrieval integration | Implemented | `WikipediaEvidenceProvider` active (live attributable encyclopedic search); `GoogleFactCheckProvider` configured with graceful fallback. |
 | URL reputation check integration | Implemented | `CloudflareDnsReputationProvider` active (live DoH 1.1.1.2 threat feed); `GoogleSafeBrowsingProvider` configured with graceful fallback. |
 | Unified scam + claim assessment | Implemented | `claimExtractor.ts` and `evidenceEvaluator.ts` identify analysis type, extract factual propositions, score relevance, and enforce verdict discipline (`supported`, `contradicted`, `mixed`, `unverified`). |
-| Hindi / Hinglish input support | Implemented | Evaluated across rules and UI presets (`language_hint` support in English, Hindi, Hinglish, Devanagari script regexes). |
-| Input validation & size limits | Implemented | Zod schemas enforce 10,000 char maximum, 2,048 char URL limits, valid http/https URLs, and opaque request IDs. |
+| Hindi / Hinglish input support | Implemented | Evaluated across rules, UI presets, and localized summary generation (`language_hint` support in English, Hindi, Hinglish, Devanagari script regexes). |
+| Input validation & size limits | Implemented | Zod schemas enforce 10,000 char maximum, 2,048 char URL limits, 5MB image file limit, and opaque request IDs. |
 | SSRF and URL safe-fetch protections | Implemented | `src/lib/security/urlSecurity.ts` strictly blocks loopback, private IPs (10/8, 172.16/12, 192.168/16), cloud metadata (169.254.169.254, metadata.google.internal), unsafe ports; server-side target page fetching prohibited. |
-| Automated tests & test fixtures | Implemented | Vitest test runner active with 106 unit, route, orchestrator, evidence, reputation, SSRF, claim verification, and rule tests passing across 10 suites. |
+| Automated tests & test fixtures | Implemented | Vitest test runner active with 135 unit, route, orchestrator, evidence, reputation, SSRF, claim verification, rules, image security, and vision tests passing across 13 suites. |
 
-### P1 Requirements (Should Ship After P0 Stable)
-- Screenshot upload and OCR/vision text extraction: Not started (Phase 5).
+### P1 & P2 Deferred Requirements
 - User feedback submission: Not started (Phase 8).
 - Safe caching with TTL: Not started (Phase 8).
+- Telegram bot, browser extension, reverse-image search, custom model training, complex user accounts: Deferred per `SOURCE_OF_TRUTH.md` (§4).
 
 ### P2 / Stretch Requirements (Explicitly Deferred)
 - Telegram bot, browser extension, reverse-image search, custom model training, complex user accounts: Deferred per `SOURCE_OF_TRUTH.md` (§4).

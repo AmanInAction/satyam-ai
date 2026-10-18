@@ -12,7 +12,7 @@ describe('Phase 5: Screenshot Analysis API Route Handlers (/api/v1/analyze/image
       const formData = new FormData();
       formData.append(
         'file',
-        new Blob([pngBuffer], { type: 'image/png' }),
+        new Blob([new Uint8Array(pngBuffer)], { type: 'image/png' }),
         'sbi_phish.png'
       );
       formData.append('language_hint', 'en');
@@ -39,7 +39,7 @@ describe('Phase 5: Screenshot Analysis API Route Handlers (/api/v1/analyze/image
       const pngBuffer = createTestPng(350, 250, dualText);
 
       const formData = new FormData();
-      formData.append('file', new Blob([pngBuffer], { type: 'image/png' }));
+      formData.append('file', new Blob([new Uint8Array(pngBuffer)], { type: 'image/png' }));
 
       const req = new NextRequest('http://localhost:3000/api/v1/analyze/image', {
         method: 'POST',
@@ -60,7 +60,7 @@ describe('Phase 5: Screenshot Analysis API Route Handlers (/api/v1/analyze/image
       const unreadablePng = createTestPng(200, 200, '[UNREADABLE]');
 
       const formData = new FormData();
-      formData.append('file', new Blob([unreadablePng], { type: 'image/png' }));
+      formData.append('file', new Blob([new Uint8Array(unreadablePng)], { type: 'image/png' }));
 
       const req = new NextRequest('http://localhost:3000/api/v1/analyze/image', {
         method: 'POST',
@@ -144,7 +144,7 @@ describe('Phase 5: Screenshot Analysis API Route Handlers (/api/v1/analyze/image
       const pngBuffer = createTestPng(400, 200, injectionText);
 
       const formData = new FormData();
-      formData.append('file', new Blob([pngBuffer], { type: 'image/png' }));
+      formData.append('file', new Blob([new Uint8Array(pngBuffer)], { type: 'image/png' }));
 
       const req = new NextRequest('http://localhost:3000/api/v1/analyze/image', {
         method: 'POST',
@@ -165,7 +165,7 @@ describe('Phase 5: Screenshot Analysis API Route Handlers (/api/v1/analyze/image
       const oversizedBuffer = Buffer.alloc(5 * 1024 * 1024 + 512);
 
       const formData = new FormData();
-      formData.append('file', new Blob([oversizedBuffer], { type: 'image/png' }));
+      formData.append('file', new Blob([new Uint8Array(oversizedBuffer)], { type: 'image/png' }));
 
       const req = new NextRequest('http://localhost:3000/api/v1/analyze/image', {
         method: 'POST',
@@ -186,7 +186,7 @@ describe('Phase 5: Screenshot Analysis API Route Handlers (/api/v1/analyze/image
       const pngBuffer = createTestPng(350, 200, hindiNotice);
 
       const formData = new FormData();
-      formData.append('file', new Blob([pngBuffer], { type: 'image/png' }));
+      formData.append('file', new Blob([new Uint8Array(pngBuffer)], { type: 'image/png' }));
       formData.append('language_hint', 'hi');
 
       const req = new NextRequest('http://localhost:3000/api/v1/analyze/image', {

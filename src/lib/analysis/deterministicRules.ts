@@ -103,13 +103,13 @@ export const DETERMINISTIC_SCAM_RULES: ScamRule[] = [
       'Contact your power utility or bank via verified official helpline numbers or official mobile apps, never numbers sent in SMS.',
     evaluate: (_text, lower) => {
       const mentionsUtility =
-        /electricity|power supply|bijli|bijlee|बिजली|sim card|सिम|bank account|खाता|pan card|पैन|aadhaar|आधार/i.test(lower);
+        /electricity|power supply|power|bijli|bijlee|बिजली|sim card|सिम|bank account|bank|sbi|yono|खाता|pan card|पैन|aadhaar|आधार/i.test(lower);
       const mentionsDisconnectionOrBlock =
-        /disconnected tonight|disconnected at|power will be cut|will be blocked|will be suspended|service stop|band ho jayega|kat diya jayega|काट दी जाएगी|काट दिया जाएगा|ब्लॉक|बंद हो जाएगा/i.test(
+        /disconnect|disconnected|disconnection|power will be cut|will be blocked|\bblocked\b|will be suspended|service stop|band ho jayega|kat diya jayega|काट दी जाएगी|काट दिया जाएगा|ब्लॉक|बंद हो जाएगा/i.test(
           lower
         );
       const hasUrgencyOrCallOfficer =
-        /immediately|within 24 hours|call officer|contact electricity officer|call immediately|turant sampark karein|तुरंत|संपर्क करें|अधिकारी|call \d{10}|\b\d{10}\b/i.test(
+        /immediately|within 24 hours|call officer|contact electricity officer|call immediately|turant sampark karein|तुरंत|संपर्क करें|अधिकारी|call \d{10}|\b\d{10}\b|update kyc/i.test(
           lower
         );
 
@@ -334,7 +334,40 @@ export const DETERMINISTIC_SCAM_RULES: ScamRule[] = [
     },
   },
 
-  // 10. Prompt Injection / Delimiter Override Defense
+  // 10. Fake Government Scheme / Subsidy Fee Trap
+  {
+    id: 'govt_scheme_fee_trap',
+    name: 'Government Scheme / Subsidy Fee Trap',
+    description: 'Promises free government laptops, solar panels, or subsidies while demanding an advance registration or processing fee via UPI.',
+    severity: 'high',
+    recommendedAction:
+      'Government welfare schemes (e.g., PM Kusum, PM Yuva, Beti Bachao) never charge registration fees via UPI or personal links. Verify at official portals ending in .gov.in or .nic.in.',
+    evaluate: (_text, lower) => {
+      const mentionsGovtOrScheme =
+        /government|govt|pm |pradhan mantri|yojana|scheme|sarkari|kusum|yuva/i.test(lower);
+      const promisesBenefit =
+        /free|subsidy|laptops?|solar panels?|cash assistance|anudan|scooter|scholarship/i.test(lower);
+      const demandsFeeOrUpi =
+        /registration fee|processing fee|pay rs|charges?|via upi|upi at|advance fee/i.test(lower);
+
+      const isLegitimateGovtDomain =
+        /\.gov\.in|\.nic\.in/i.test(lower) && !demandsFeeOrUpi;
+
+      if (mentionsGovtOrScheme && promisesBenefit && demandsFeeOrUpi && !isLegitimateGovtDomain) {
+        return {
+          code: 'govt_scheme_fee_trap',
+          title: 'Fake Government Scheme Registration Fee Trap',
+          explanation:
+            'Promotes a purported government scheme or subsidy while demanding an advance registration fee via UPI or unofficial links. Authentic government programs never collect fees via UPI.',
+          signal_type: 'deterministic_rule',
+          evidence_refs: [],
+        };
+      }
+      return null;
+    },
+  },
+
+  // 11. Prompt Injection / Delimiter Override Defense
   {
     id: 'prompt_injection_defense',
     name: 'Prompt Injection / Instruction Override Attempt',

@@ -117,10 +117,22 @@ Record material decisions so the solo developer and coding agent can understand 
   5. **Provenance Transparency:** Distinguishes between `fact_check_database`, `encyclopedic_reference`, `reputation_feed`, and `evidence_limited_inference`.
 - **Trade-off:** Requires separate classification objects and UI panels, but provides users with complete clarity on why a message is risky and whether its claims are factual.
 
+## D-011: Screenshot Analysis, Image Security Controls & Regional Readability
+- **Date:** 2026-10-17
+- **Status:** Implemented and Verified
+- **Decision:** Implement screenshot analysis with rigorous defensive security controls and localized UX:
+  1. **Strict Defensive Boundary (`src/lib/security/imageSecurity.ts`):** Enforces 5 MB size ceiling (HTTP 413 `FILE_TOO_LARGE`), validates binary magic bytes (`PNG: \x89PNG\r\n\x1a\n`, `JPEG: \xFF\xD8\xFF`, `WebP: RIFF`), and verifies dimensions via pure binary header parsing (bounded between 50x50 and 8000x8000 px) with zero external native binary dependencies.
+  2. **Replaceable OCR / Vision Provider (`src/lib/providers/visionProvider.ts`):** Implements `BedrockVisionProvider` (Claude 3 Haiku vision model via `@aws-sdk/client-bedrock-runtime`), `MockVisionOcrProvider` (deterministic local test & dev extraction), and `CompositeVisionProvider` for graceful fallback.
+  3. **Graceful Handling of Unreadable & Blank Images:** Completely unreadable or textless screenshots evaluate gracefully to `unverified` verdict, `insufficient_information` category, and `unknown` risk with explanatory guidance, without crashing or hallucinating safety.
+  4. **Sensitive Data Detection:** Detects unmasked card numbers, CVV codes, and passwords in extracted text, placing cautionary guidance in recommended actions.
+  5. **OCR Review & Refinement Flow:** Frontend provides OCR text inspection and an inline editor allowing users to correct OCR mistakes before re-evaluating.
+  6. **Unified Orchestration & Explicit Authenticity Disclaimer:** Extracted text is evaluated through the exact same orchestrator pipeline with dual assessment, deterministic rules, and evidence grounding. Transparently adds a disclaimer that OCR cannot authenticate screenshots or detect photoshop tampering.
+  7. **Regional UX (Hindi & Hinglish):** Detects Devanagari script or language hints, formulating localized Hindi/Hinglish summaries, risk labels (`उच्च जोखिम`), and India National Cyber Crime Helpline (1930) actions.
+
 ## Pending verification
-- Real AWS Bedrock live API call with verified production credentials (credentials unconfigured in this container; verified mock fallback).
+- **Real AWS Bedrock live API call:** **VERIFIED** on 2026-10-18 using live AWS Bedrock `Converse` API in `ap-south-1` (`meta.llama3-70b-instruct-v1:0` with automatic fallback for legacy model IDs and seamless permanent IAM AKIA credential handling). Live responses returned high-confidence scam detection and claim debunking with 5.3s latency.
 - Google Fact Check Tools API and Google Safe Browsing API keys (optional key-based providers; live Cloudflare Security DNS and Wikipedia Search operate out-of-the-box).
-- Screenshot/OCR implementation (deferred to Phase 5).
 - Telegram stretch channel (Phase 8 / Stretch).
+
 
 

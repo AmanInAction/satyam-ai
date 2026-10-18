@@ -47,6 +47,9 @@ export class BedrockVisionProvider implements IVisionOcrProvider {
     const secretAccessKey = config.secretAccessKey || process.env.AWS_SECRET_ACCESS_KEY;
     const sessionToken = config.sessionToken || process.env.AWS_SESSION_TOKEN;
 
+    const shouldUseSessionToken =
+      Boolean(sessionToken) && (!accessKeyId || !accessKeyId.startsWith('AKIA'));
+
     if (config.client) {
       this.client = config.client;
       this.isConfiguredState = true;
@@ -56,7 +59,7 @@ export class BedrockVisionProvider implements IVisionOcrProvider {
         credentials: {
           accessKeyId,
           secretAccessKey,
-          ...(sessionToken ? { sessionToken } : {}),
+          ...(shouldUseSessionToken ? { sessionToken } : {}),
         },
       });
       this.isConfiguredState = true;
@@ -170,12 +173,12 @@ export class MockVisionOcrProvider implements IVisionOcrProvider {
 
   async extractText(imageBuffer: Buffer): Promise<VisionOcrResult> {
     // 1. Check if the buffer contains an embedded textual tag in trailing bytes (useful for unit tests)
-    const trailingAscii = imageBuffer.toString('ascii');
+    const trailingUtf8 = imageBuffer.toString('utf-8');
     const mockPrefix = 'MOCK_OCR:';
-    const tagIndex = trailingAscii.indexOf(mockPrefix);
+    const tagIndex = trailingUtf8.indexOf(mockPrefix);
 
     if (tagIndex !== -1) {
-      let extracted = trailingAscii.slice(tagIndex + mockPrefix.length).trim();
+      let extracted = trailingUtf8.slice(tagIndex + mockPrefix.length).trim();
       if (MockVisionOcrProvider.mockFixtureRegistry.has(extracted)) {
         extracted = MockVisionOcrProvider.mockFixtureRegistry.get(extracted)!;
       }
@@ -199,7 +202,7 @@ export class MockVisionOcrProvider implements IVisionOcrProvider {
 
     // 2. Check if a fixture is registered in the static map
     for (const [key, text] of MockVisionOcrProvider.mockFixtureRegistry.entries()) {
-      if (trailingAscii.includes(key)) {
+      if (trailingUtf8.includes(key)) {
         const sensitive = checkSensitiveImageCues(text);
         return {
           extractedText: text,

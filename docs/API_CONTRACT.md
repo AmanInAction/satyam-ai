@@ -58,6 +58,28 @@ Validation expectations:
 - Do not fetch arbitrary target URLs unless the SSRF-safe design in `SOURCE_OF_TRUTH.md` is implemented and tested.
 - Missing keys, timeouts, or no reputation result must not become a clean/safe verdict.
 
+## Image request
+
+`POST /api/v1/analyze/image`
+
+Supported Request Encodings:
+1. `multipart/form-data`:
+   - `file` or `image`: image binary upload (`image/png`, `image/jpeg`, `image/webp`).
+   - `language_hint`: `auto`, `en`, `hi`, `hinglish` (optional).
+2. `application/json`:
+   - `image_data`: base64-encoded image string (with or without data URI scheme).
+   - `mime_type`: `image/png`, `image/jpeg`, or `image/webp`.
+   - `language_hint`: `auto`, `en`, `hi`, `hinglish` (optional).
+
+Validation & Security expectations:
+- File size capped at 5 MB (`MAX_IMAGE_SIZE_BYTES = 5,242,880`). Requests exceeding limit return HTTP 413 `FILE_TOO_LARGE`.
+- Magic byte verification: validates container signatures (`PNG: \x89PNG\r\n\x1a\n`, `JPEG: \xFF\xD8\xFF`, `WebP: RIFF....WEBP`).
+- Safe dimensions: parsed securely via binary headers without external dependencies; bounded between 50x50 and 8000x8000 px.
+- Unreadable/blank image handling: returns safe `unverified` verdict, `insufficient_information` category, and `unknown` risk level without crashing or hallucinating safety.
+- Sensitive credential guard: warns user if unmasked credit cards, CVVs, or netbanking passwords are detected in screenshot text.
+- Adversarial prompt injection defense: instructions embedded within image text are treated as untrusted and cannot override system verdicts.
+- Authenticity disclaimer: transparently records limitations that OCR cannot detect photoshop tampering, receipt forgery, or screenshot authenticity.
+
 ## Response model target
 
 Illustrative shape only; exact field names/enums must match current Zod schemas. Do not introduce breaking schema changes without updating tests and all consumers.
