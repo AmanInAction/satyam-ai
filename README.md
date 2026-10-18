@@ -39,14 +39,37 @@ Before connecting a provider, verify current official API docs, model availabili
 ## Local development
 
 Use the scripts that actually exist in `package.json`. At minimum, the coding agent must verify and document:
-- dependency installation;
-- development server startup;
-- lint/type-check command;
-- test command;
-- production build;
-- required environment variables.
+- dependency installation (`npm install`);
+- development server startup (`npm run dev`);
+- lint/type-check command (`npm run lint`);
+- test command (`npm test`);
+- production build (`npm run build`);
+- required environment variables (`.env.example`).
 
 Do not guess commands or mark them verified without running them.
+
+## Telegram Bot Integration
+
+SatyamAI includes a production-grade Telegram Bot Webhook endpoint reusing the central analysis pipeline:
+
+- **Webhook URL:** `https://<YOUR_DEPLOYED_DOMAIN>/api/v1/telegram/webhook`
+- **Diagnostics Check:** `GET /api/v1/telegram/webhook`
+- **Environment Variables:**
+  - `TELEGRAM_BOT_TOKEN`: The API token provided by `@BotFather` (server-side only).
+  - `TELEGRAM_WEBHOOK_SECRET`: Secret token for validating `X-Telegram-Bot-Api-Secret-Token` header.
+- **Webhook Registration Command:**
+  ```bash
+  curl -F "url=https://<YOUR_DOMAIN>/api/v1/telegram/webhook" \
+       -F "secret_token=<YOUR_TELEGRAM_WEBHOOK_SECRET>" \
+       https://api.telegram.org/bot<YOUR_TELEGRAM_BOT_TOKEN>/setWebhook
+  ```
+- **Features Supported:**
+  - Commands: `/start`, `/help` (Bilingual English + Hindi with National Cyber Crime Helpline 1930).
+  - Text & Forwarded Messages: Full scam risk & factual accuracy analysis.
+  - Links: Phishing and domain spoofing assessment.
+  - Deduplication: In-memory `update_id` cache prevents duplicate processing on network retries.
+  - Per-Chat Rate Limiting: 30 requests/minute.
+  - Zero raw message persistence.
 
 ## Agent rules
 

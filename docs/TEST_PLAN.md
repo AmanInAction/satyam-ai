@@ -139,10 +139,10 @@ Traceability matrix mapping core differentiators to repository files, tests, and
 | **F10**| Real URL reputation provider | `src/lib/providers/reputationProvider.ts` (`CloudflareDnsReputationProvider` live DNS threat feed + `GoogleSafeBrowsingProvider`) | `tests/reputationProvider.test.ts` (5 tests) | **Implemented & Verified (Real Live Provider)** |
 | **F11**| Grounded claim extraction & verification | `src/lib/analysis/claimExtractor.ts`, `src/lib/analysis/evidenceEvaluator.ts` (detects analysis type, extracts propositions, scores relevance, enforces verdict discipline) | `tests/claimVerification.test.ts` (15 tests) | **Implemented & Verified** |
 | **F12**| Privacy by default | Zero persistent database storage; no raw body logging | Server config & routes | **Implemented & Verified** |
-| **F13**| False-pos / false-neg tracking | Evaluation dataset in test plan | `tests/*.test.ts` (144 automated tests passing across 14 suites) | **Verified (Phase 6 & 7)** |
+| **F13**| False-pos / false-neg tracking | Evaluation dataset in test plan | `tests/*.test.ts` (182 automated tests passing across 16 suites) | **Verified (Phase 6, 7 & 8)** |
 | **F14**| Screenshot / OCR | Multipart upload, vision adapter, image security, OCR review & refinement | `tests/imageSecurity.test.ts` (13 tests), `tests/visionProvider.test.ts` (7 tests), `tests/imageApiRoute.test.ts` (9 tests) | **Implemented & Verified** |
-| **F15**| Telegram bot | Reuses `/api/v1/analyze` pipeline | — | **Deferred (Phase 8 - P2 / Stretch)** |
-| **F16**| Feedback / history | Data-minimized feedback schema | — | **Deferred (Phase 8 - P1)** |
+| **F15**| Telegram bot | Webhook route, deduplication, rate limits, Markdown formatter | `tests/telegramWebhook.test.ts` (17 tests) | **Implemented & Verified (Phase 8)** |
+| **F16**| Feedback / history | Data-minimized feedback schema | — | **Deferred (Phase 8 - P2)** |
 | **F17**| Rate Limiting & Security Headers | `src/lib/security/rateLimiter.ts`, `src/lib/security/logger.ts`, `next.config.mjs` | `tests/phase6SecurityPrivacy.test.ts` (9 tests) | **Implemented & Verified** |
 
 ## Test report format

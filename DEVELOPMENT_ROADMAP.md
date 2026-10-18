@@ -117,18 +117,22 @@ The migration report says the repository was moved to a full-stack Next.js App R
 
 **Gate:** primary flows work on desktop/mobile; no unreported critical failure or fabricated evidence. (PASS - Release Candidate Ready)
 
-## Phase 8 — Optional differentiators
-**Only after P0 release gates pass; target Nov 3–5 if timing permits**
+## Phase 8 — Telegram Bot MVP & Optional differentiators
+**Priority:** Differentiator (P1)  
+**Status:** Completed & Verified (2026-10-18)
 
-Order of preference:
-1. Telegram bot reusing the same server-side analysis flow.
-2. Minimal feedback collection with data minimization.
-3. Basic cache only where useful and safe.
-4. History only if retention/deletion and disclosure are fully implemented.
+- [x] Secure Telegram Webhook endpoint implemented at `/api/v1/telegram/webhook` (`app/api/v1/telegram/webhook/route.ts`).
+- [x] Secret token authentication via `X-Telegram-Bot-Api-Secret-Token` header matching `TELEGRAM_WEBHOOK_SECRET`.
+- [x] Full reuse of SatyamAI's core intelligence: routes text and URLs directly to `AnalysisOrchestrator` without duplicate rules or secondary LLM workflows.
+- [x] Dual-verdict preservation in Telegram output: cleanly separates Scam & Fraud Risk from Factual Accuracy.
+- [x] Command handling: `/start` (bilingual English + Hindi welcome with Helpline 1930) and `/help` (verdict guide).
+- [x] Update deduplication: `update_id` in-memory tracking prevents double-processing on Telegram network retries (`src/lib/telegram/updateTracker.ts`).
+- [x] Regional language support: Native awareness of English, Hindi, and Hinglish suspicious messages.
+- [x] Actionable Indian cybercrime guidance: Always promotes National Cyber Crime Helpline `1930` and `cybercrime.gov.in` for high/medium threats.
+- [x] Privacy and security: Zero raw message persistence, redacted logging, server-only tokens, per-chat sliding-window rate limiting.
+- [x] 17 focused automated tests passing in `tests/telegramWebhook.test.ts` (182 total repository tests passing).
 
-Do not start browser extensions, deepfake detection, reverse-image search, complex accounts, admin portals, custom training, or microservices during the submission window.
-
-**Gate:** feature is real, tested, documented, and does not regress core functionality. If time is short, defer it.
+**Gate:** feature is real, tested, documented, and does not regress core functionality. (PASS - Telegram MVP Verified)
 
 ## Submission buffer — Nov 13–14
 

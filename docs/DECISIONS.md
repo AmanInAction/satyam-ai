@@ -129,10 +129,23 @@ Record material decisions so the solo developer and coding agent can understand 
   6. **Unified Orchestration & Explicit Authenticity Disclaimer:** Extracted text is evaluated through the exact same orchestrator pipeline with dual assessment, deterministic rules, and evidence grounding. Transparently adds a disclaimer that OCR cannot authenticate screenshots or detect photoshop tampering.
   7. **Regional UX (Hindi & Hinglish):** Detects Devanagari script or language hints, formulating localized Hindi/Hinglish summaries, risk labels (`उच्च जोखिम`), and India National Cyber Crime Helpline (1930) actions.
 
-## Pending verification
-- **Real AWS Bedrock live API call:** **VERIFIED** on 2026-10-18 using live AWS Bedrock `Converse` API in `ap-south-1` (`meta.llama3-70b-instruct-v1:0` with automatic fallback for legacy model IDs and seamless permanent IAM AKIA credential handling). Live responses returned high-confidence scam detection and claim debunking with 5.3s latency.
-- Google Fact Check Tools API and Google Safe Browsing API keys (optional key-based providers; live Cloudflare Security DNS and Wikipedia Search operate out-of-the-box).
-- Telegram stretch channel (Phase 8 / Stretch).
+## Verified External Integrations
+- **Real AWS Bedrock live API call:** **VERIFIED** on 2026-10-18 using live AWS Bedrock `Converse` API in `ap-south-1` with 5.3s response time.
+- **Wikipedia Evidence Provider:** **VERIFIED** live keyless attributable citations.
+- **Cloudflare DNS 1.1.1.2 Reputation Provider:** **VERIFIED** live DNS-over-HTTPS threat queries.
+- **Telegram Webhook Integration:** **VERIFIED** on 2026-10-18 via Next.js App Router Webhook endpoint (`/api/v1/telegram/webhook`) reusing `AnalysisOrchestrator`.
+
+## D-016 — Phase 8 Telegram Webhook Integration & Pipeline Reuse
+- **Date:** 2026-10-18
+- **Status:** Implemented and Verified
+- **Decision:** Implement a secure, server-side Telegram Webhook handler at `/api/v1/telegram/webhook` that routes messages directly through the existing `AnalysisOrchestrator` without creating a second intelligence workflow or duplicating analysis rules.
+- **Key Safeguards:**
+  1. **Direct Webhook Responses:** Uses Telegram's direct JSON response payload (`{ method: 'sendMessage', chat_id, text, parse_mode: 'Markdown' }`) for zero-latency responses.
+  2. **Secret Token Verification:** Validates `X-Telegram-Bot-Api-Secret-Token` matching `TELEGRAM_WEBHOOK_SECRET` before processing.
+  3. **Update Deduplication:** In-memory `update_id` cache prevents duplicate processing on Telegram network retries.
+  4. **Per-Chat Rate Limiting:** Sliding-window per-chat rate limiter (30 req/min) prevents spam abuse.
+  5. **Dual-Verdict Output:** Formats separate Scam Risk and Factual Claim assessments with citations and Helpline 1930 prompts.
+  6. **Privacy by Default:** Zero message persistence; logs are stripped of credentials and sensitive content.
 
 
 

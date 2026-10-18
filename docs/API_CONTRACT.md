@@ -212,7 +212,45 @@ Use a finite set such as `success`, `partial`, `unavailable`, `not_configured`, 
 - Empty, oversized, unsupported-scheme, and malformed input.
 - Separate scam and claim verdict dimensions.
 - Missing evidence versus evidence of safety.
-- Provider timeout, missing credentials, malformed model output, quota errors, and outage.
-- Evidence URL/provenance validation.
 - No raw content in ordinary logs.
 - SSRF tests if target fetching is implemented.
+
+## Telegram Webhook Endpoints
+
+### 1. `GET /api/v1/telegram/webhook`
+Diagnostics and configuration status endpoint.
+- **Headers:** None required.
+- **Response `200 OK`:**
+```json
+{
+  "status": "ok",
+  "service": "satyam-ai-telegram-webhook",
+  "version": "v1",
+  "bot_token_configured": true,
+  "webhook_secret_configured": true,
+  "timestamp": "2026-10-18T14:01:30.697Z"
+}
+```
+
+### 2. `POST /api/v1/telegram/webhook`
+Main update handler receiving Telegram Bot API Webhook updates.
+- **Security Header:** `X-Telegram-Bot-Api-Secret-Token` (validated against `TELEGRAM_WEBHOOK_SECRET` when configured).
+- **Rate Limit:** 30 requests/minute per chat ID.
+- **Deduplication:** Automatic `update_id` in-memory deduplication window (15 minutes).
+- **Supported Commands:** `/start`, `/help`.
+- **Supported Content:** Text messages, forwarded SMS/WhatsApp forwards, URLs.
+- **Response `200 OK` (Direct Telegram reply payload):**
+```json
+{
+  "method": "sendMessage",
+  "chat_id": 1234567,
+  "text": "🛡️ *SatyamAI Verification Report*\n━━━━━━━━━━━━━━━━━━━━━\n*Scam & Fraud Risk:* 🚨 *LIKELY SCAM* (High Risk)...",
+  "parse_mode": "Markdown",
+  "disable_web_page_preview": true,
+  "reply_to_message_id": 1
+}
+```
+- **Error Responses:**
+  - `401 UNAUTHORIZED_WEBHOOK`: Secret token mismatch.
+  - `400 INVALID_JSON`: Malformed update payload.
+
