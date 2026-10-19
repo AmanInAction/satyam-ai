@@ -7,7 +7,6 @@ import {
   Receipt,
   ShieldAlert,
   PhoneCall,
-  Sparkles,
   AlertTriangle,
   ArrowRight,
   ExternalLink,
@@ -31,39 +30,39 @@ export function CreditBar({
   const isExhausted = available <= 0;
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-md">
-      {/* Left side: Balance and Freemium indicator */}
+    <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl bg-white border border-slate-200 shadow-xs">
+      {/* Left side: Balance and allowance indicator */}
       <div className="flex items-center gap-3">
         <div
-          className={`p-2.5 rounded-xl border ${
+          className={`p-2.5 rounded-lg border ${
             isExhausted
-              ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
-              : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+              ? 'bg-rose-50 border-rose-200 text-rose-700'
+              : 'bg-slate-100 border-slate-200 text-slate-700'
           }`}
         >
           <Coins className="w-5 h-5" />
         </div>
 
         <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 font-medium">Verification Credits:</span>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-slate-600 font-medium">Checks available:</span>
             <span
-              className={`text-sm font-extrabold ${
-                isExhausted ? 'text-rose-400' : 'text-emerald-400'
+              className={`text-sm font-bold ${
+                isExhausted ? 'text-rose-700' : 'text-slate-900'
               }`}
             >
-              {isLoading ? '...' : `${available} Available`}
+              {isLoading ? '...' : available}
             </span>
             {balance !== available && (
-              <span className="text-[11px] text-slate-500 font-mono">
-                ({balance - available} reserved)
+              <span className="text-slate-500">
+                ({balance - available} pending)
               </span>
             )}
           </div>
-          <p className="text-[11px] text-slate-500">
+          <p className="text-xs text-slate-500 mt-0.5">
             {isExhausted
-              ? 'Credits exhausted. Top up via PayPal Sandbox to continue.'
-              : 'Every new user gets 3 free credits. 1 credit/text, 1 credit/URL, 2 credits/screenshot.'}
+              ? 'You have used your free checks. Get more checks below to continue checking messages.'
+              : '3 free checks included for new users · 1 check per message or link · 2 per screenshot'}
           </p>
         </div>
       </div>
@@ -73,26 +72,23 @@ export function CreditBar({
         <button
           type="button"
           onClick={onOpenLedger}
-          className="px-3 py-1.5 rounded-xl border border-slate-800 hover:bg-slate-800 text-slate-300 text-xs font-medium flex items-center gap-1.5 transition"
+          className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-medium flex items-center gap-1.5 transition focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 outline-none"
         >
-          <Receipt className="w-3.5 h-3.5 text-purple-400" />
-          <span>Ledger History</span>
+          <Receipt className="w-3.5 h-3.5 text-slate-500" />
+          <span>Check history</span>
         </button>
 
         <button
           type="button"
           onClick={onOpenTopUp}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-sm ${
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shadow-xs focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 outline-none ${
             isExhausted
-              ? 'bg-rose-600 hover:bg-rose-500 text-white animate-pulse'
-              : 'bg-blue-600 hover:bg-blue-500 text-white'
+              ? 'bg-rose-600 hover:bg-rose-700 text-white'
+              : 'bg-blue-600 hover:bg-blue-700 text-white'
           }`}
         >
           <PlusCircle className="w-3.5 h-3.5" />
-          <span>Top Up Credits</span>
-          <span className="text-[9px] px-1.5 py-0.2 rounded bg-white/20 uppercase font-mono">
-            PayPal
-          </span>
+          <span>Get more checks</span>
         </button>
       </div>
     </div>
@@ -100,91 +96,90 @@ export function CreditBar({
 }
 
 /**
- * Essential safety guidance card displayed when credits are exhausted,
- * guaranteeing the user never loses access to vital scam prevention rules.
+ * Essential safety guidance card displayed when checks are exhausted,
+ * guaranteeing the user always has access to vital scam prevention rules.
  */
 export function EssentialSafetyGuidanceCard({ onOpenTopUp }: { onOpenTopUp: () => void }) {
   return (
-    <div className="rounded-2xl border border-amber-500/30 bg-amber-950/20 p-5 sm:p-6 backdrop-blur-sm shadow-xl space-y-4">
+    <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-5 sm:p-6 shadow-sm space-y-4">
       <div className="flex items-start gap-3">
-        <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 shrink-0">
+        <div className="p-2.5 rounded-xl bg-amber-100 border border-amber-200 text-amber-700 shrink-0">
           <ShieldAlert className="w-6 h-6" />
         </div>
         <div className="flex-1">
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <h3 className="text-base font-bold text-amber-200">
-              Credits Exhausted — Essential Scam Safety Guidance
+            <h3 className="text-base font-bold text-slate-900">
+              Checks Exhausted — Essential Safety Rules
             </h3>
-            <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300">
-              Active Protection
+            <span className="text-xs font-semibold text-amber-800">
+              Always available
             </span>
           </div>
-          <p className="text-xs text-amber-300/80 mt-1">
-            Even with 0 credits remaining, SatyamAI ensures you stay protected. Review these essential Indian cybercrime defense rules before acting on any suspicious message:
+          <p className="text-xs text-slate-600 mt-1">
+            Even with 0 checks remaining, keep these essential safety rules in mind before acting on any message:
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-xs">
-        <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-slate-300 space-y-1">
-          <div className="font-semibold text-rose-400 flex items-center gap-1.5">
-            <AlertTriangle className="w-3.5 h-3.5" />
-            <span>Never Share OTPs or UPI PINs</span>
+        <div className="p-3.5 rounded-xl bg-white border border-amber-200/80 text-slate-700 space-y-1">
+          <div className="font-semibold text-rose-700 flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+            <span>Never Share OTPs or Enter UPI PINs to Receive Money</span>
           </div>
-          <p className="text-[11px] text-slate-400">
-            Entering a UPI PIN always deducts money from your account. You NEVER need to enter a PIN or scan a QR code to receive cashback or refunds.
+          <p className="text-xs text-slate-600">
+            A UPI PIN is only required to send money. You NEVER need to enter a PIN or scan a QR code to receive money, cashback, or refunds.
           </p>
         </div>
 
-        <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-slate-300 space-y-1">
-          <div className="font-semibold text-amber-400 flex items-center gap-1.5">
-            <AlertTriangle className="w-3.5 h-3.5" />
-            <span>Beware Electricity Cut-Off Threats</span>
+        <div className="p-3.5 rounded-xl bg-white border border-amber-200/80 text-slate-700 space-y-1">
+          <div className="font-semibold text-amber-800 flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+            <span>Electricity Disconnection Threats Are Scams</span>
           </div>
-          <p className="text-[11px] text-slate-400">
-            Power utilities never send personal SMS messages threatening disconnection tonight with a mobile callback number or asking to install an APK.
+          <p className="text-xs text-slate-600">
+            Power utilities never send personal SMS threats warning of disconnection tonight with an unofficial mobile number or link.
           </p>
         </div>
 
-        <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-slate-300 space-y-1">
-          <div className="font-semibold text-blue-400 flex items-center gap-1.5">
-            <AlertTriangle className="w-3.5 h-3.5" />
-            <span>No "Digital Arrest" Under Indian Law</span>
+        <div className="p-3.5 rounded-xl bg-white border border-amber-200/80 text-slate-700 space-y-1">
+          <div className="font-semibold text-blue-700 flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+            <span>There Is No &quot;Digital Arrest&quot; Under Indian Law</span>
           </div>
-          <p className="text-[11px] text-slate-400">
-            Police, CBI, ED, and customs officials never place citizens under arrest via Skype or WhatsApp video calls or demand financial security deposits.
+          <p className="text-xs text-slate-600">
+            Police, CBI, ED, and customs officials never arrest people over video calls or demand security deposits to clear cases.
           </p>
         </div>
 
-        <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-slate-300 space-y-1">
-          <div className="font-semibold text-emerald-400 flex items-center gap-1.5">
-            <PhoneCall className="w-3.5 h-3.5" />
+        <div className="p-3.5 rounded-xl bg-white border border-amber-200/80 text-slate-700 space-y-1">
+          <div className="font-semibold text-emerald-700 flex items-center gap-1.5">
+            <PhoneCall className="w-3.5 h-3.5 shrink-0" />
             <span>National Cyber Crime Helpline: 1930</span>
           </div>
-          <p className="text-[11px] text-slate-400">
-            If you transferred funds to a fraudulent party, immediately dial <strong>1930</strong> within the golden hour to freeze bank transfers, or report at <strong>cybercrime.gov.in</strong>.
+          <p className="text-xs text-slate-600">
+            If you transferred funds to a suspected fraudster, immediately call <strong>1930</strong> to freeze transfers, or report at <strong>cybercrime.gov.in</strong>.
           </p>
         </div>
       </div>
 
-      <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-amber-500/20">
+      <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-amber-200">
         <a
           href="https://cybercrime.gov.in"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1.5 underline"
+          className="text-xs text-blue-700 hover:text-blue-800 flex items-center gap-1 font-medium focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 outline-none rounded"
         >
-          <span>Visit Official National Cyber Crime Reporting Portal</span>
+          <span>Official National Cyber Crime Reporting Portal</span>
           <ExternalLink className="w-3 h-3" />
         </a>
 
         <button
           type="button"
           onClick={onOpenTopUp}
-          className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20"
+          className="w-full sm:w-auto px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition flex items-center justify-center gap-2 shadow-xs focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 outline-none"
         >
-          <Sparkles className="w-4 h-4" />
-          <span>Top Up Credits with PayPal Sandbox</span>
+          <span>Get more checks</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </button>
       </div>

@@ -219,7 +219,7 @@ describe('Phase 8: Telegram Bot Webhook Integration', () => {
         message: {
           message_id: 5,
           date: Math.floor(Date.now() / 1000),
-          chat: { id: 222, type: 'private' },
+          chat: { id: 223, type: 'private' },
           text: upiScam,
         },
       };
@@ -278,7 +278,7 @@ describe('Phase 8: Telegram Bot Webhook Integration', () => {
         message: {
           message_id: 8,
           date: Math.floor(Date.now() / 1000),
-          chat: { id: 444, type: 'private' },
+          chat: { id: 445, type: 'private' },
           text: hinglishScam,
         },
       };

@@ -158,25 +158,25 @@ export function formatAnalysisReport(analysis: AnalysisResponse, remainingCredit
 }
 
 export function formatCreditsExhaustedMessage(): string {
-  return `⏳ *Credits Exhausted*
+  return `⏳ *Checks Exhausted*
 
-You have used all your free verification credits.
+You have used all your free safety checks.
 
-To purchase additional analysis credits via our PayPal Sandbox store, visit the SatyamAI web app or choose a package:
-• *Starter Pack:* 10 Credits ($2.00)
-• *Plus Pack:* 30 Credits ($5.00)
+To get more safety checks, visit the SatyamAI web app or choose a package:
+• *Starter Pack:* 10 Checks ($2.00)
+• *Plus Pack:* 30 Checks ($5.00)
 
 _For urgent cyber fraud reporting in India, call 1930 immediately._`;
 }
 
 export function formatCreditsStatusMessage(balance: number, available: number): string {
-  return `⭐ *SatyamAI Credit Balance*
+  return `⭐ *SatyamAI Check Balance*
 
-• *Total Credits:* ${balance}
-• *Available Credits:* ${available}
-• *Cost per Check:* 1 Credit (Text / URL), 2 Credits (Screenshot)
+• *Total Checks:* ${balance}
+• *Available Checks:* ${available}
+• *Cost per Check:* 1 Check (Message / Link), 2 Checks (Screenshot)
 
-Every new account receives 3 free credits upon signup. Additional credit packages can be purchased via PayPal Sandbox.`;
+Every new account receives 3 free checks upon signup. Additional check packages can be purchased in the web app.`;
 }
 
 function formatScamVerdict(verdict: ScamVerdict): string {
