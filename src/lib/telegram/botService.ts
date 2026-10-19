@@ -7,8 +7,12 @@ import {
   formatUnsupportedInputMessage,
   formatRateLimitMessage,
   formatErrorMessage,
+  formatCreditsExhaustedMessage,
+  formatCreditsStatusMessage,
 } from './formatter';
 import { AnalysisOrchestrator, defaultOrchestrator } from '../analysis/orchestrator';
+import { defaultCreditLedger } from '../payments/ledger';
+import { CreditReservation } from '../payments/types';
 import { safeLogger } from '../security/logger';
 import { generateRequestId } from '../errors/apiError';
 
@@ -130,36 +134,74 @@ export class TelegramBotService {
       };
     }
 
-    // 5. Route to SatyamAI Orchestrator (Unified Intelligence)
-    try {
-      const isCleanUrl = /^https?:\/\/[^\s]+$/i.test(rawText);
+    const telegramUserId = `telegram_${chatId}`;
 
-      if (isCleanUrl) {
-        safeLogger.info(`Telegram analyzing URL for chat ${chatId}`);
-        const analysis = await this.orchestrator.analyzeUrl(rawText);
+    if (commandLower === '/credits' || commandLower === '/balance') {
+      const balance = await defaultCreditLedger.getBalance(telegramUserId);
+      return {
+        method: 'sendMessage',
+        chat_id: chatId,
+        text: formatCreditsStatusMessage(balance.balance, balance.available),
+        parse_mode: 'Markdown',
+        disable_web_page_preview: true,
+      };
+    }
+
+    // 5. Check and Reserve Credits (1 credit for text or URL)
+    const isCleanUrl = /^https?:\/\/[^\s]+$/i.test(rawText);
+    let reservation: CreditReservation | null = null;
+
+    try {
+      reservation = await defaultCreditLedger.reserveCredits(
+        telegramUserId,
+        1,
+        isCleanUrl ? 'url' : 'text'
+      );
+    } catch (creditErr: unknown) {
+      if ((creditErr as any)?.code === 'INSUFFICIENT_CREDITS') {
         return {
           method: 'sendMessage',
           chat_id: chatId,
-          text: formatAnalysisReport(analysis),
+          text: formatCreditsExhaustedMessage(),
           parse_mode: 'Markdown',
-          disable_web_page_preview: true,
           reply_to_message_id: message.message_id,
         };
+      }
+    }
+
+    // 6. Route to SatyamAI Orchestrator (Unified Intelligence)
+    try {
+      let analysis;
+      if (isCleanUrl) {
+        safeLogger.info(`Telegram analyzing URL for chat ${chatId}`);
+        analysis = await this.orchestrator.analyzeUrl(rawText);
       } else {
         safeLogger.info(`Telegram analyzing text (${rawText.length} chars) for chat ${chatId}`);
         const langCode = message.from?.language_code;
         const langHint = langCode === 'hi' ? 'hi' : 'auto';
-        const analysis = await this.orchestrator.analyzeText(rawText, langHint);
-        return {
-          method: 'sendMessage',
-          chat_id: chatId,
-          text: formatAnalysisReport(analysis),
-          parse_mode: 'Markdown',
-          disable_web_page_preview: true,
-          reply_to_message_id: message.message_id,
-        };
+        analysis = await this.orchestrator.analyzeText(rawText, langHint);
       }
+
+      // Commit credit reservation
+      if (reservation) {
+        await defaultCreditLedger.commitReservation(reservation.reservationId, analysis.analysis_id);
+      }
+
+      const balance = await defaultCreditLedger.getBalance(telegramUserId);
+
+      return {
+        method: 'sendMessage',
+        chat_id: chatId,
+        text: formatAnalysisReport(analysis, balance.available),
+        parse_mode: 'Markdown',
+        disable_web_page_preview: true,
+        reply_to_message_id: message.message_id,
+      };
     } catch (err: unknown) {
+      if (reservation) {
+        await defaultCreditLedger.releaseReservation(reservation.reservationId, 'analysis_failed');
+      }
+
       const requestId = generateRequestId();
       safeLogger.error(`Error processing Telegram message: ${(err as Error)?.message}`, {
         chatId,

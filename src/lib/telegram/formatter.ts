@@ -77,7 +77,7 @@ If this is an urgent financial emergency, do not click any links or share OTPs. 
 /**
  * Formats an AnalysisResponse into a clean Telegram Markdown message.
  */
-export function formatAnalysisReport(analysis: AnalysisResponse): string {
+export function formatAnalysisReport(analysis: AnalysisResponse, remainingCredits?: number): string {
   const parts: string[] = [];
 
   // 1. Header
@@ -145,11 +145,38 @@ export function formatAnalysisReport(analysis: AnalysisResponse): string {
     parts.push(`\n🚨 *National Cyber Crime Helpline:* Call *1930* or visit [cybercrime.gov.in](https://cybercrime.gov.in) to report fraud.`);
   }
 
-  // 9. Limitations & Footer
+  // 9. Remaining Credits (if provided)
+  if (remainingCredits !== undefined) {
+    parts.push(`\n⭐ *Remaining Credits:* ${remainingCredits}`);
+  }
+
+  // 10. Limitations & Footer
   parts.push(`━━━━━━━━━━━━━━━━━━━━━`);
   parts.push(`_⚠️ SatyamAI provides decision support. Absence of detected patterns does not guarantee authenticity._`);
 
   return parts.join('\n');
+}
+
+export function formatCreditsExhaustedMessage(): string {
+  return `⏳ *Credits Exhausted*
+
+You have used all your free verification credits.
+
+To purchase additional analysis credits via our PayPal Sandbox store, visit the SatyamAI web app or choose a package:
+• *Starter Pack:* 10 Credits ($2.00)
+• *Plus Pack:* 30 Credits ($5.00)
+
+_For urgent cyber fraud reporting in India, call 1930 immediately._`;
+}
+
+export function formatCreditsStatusMessage(balance: number, available: number): string {
+  return `⭐ *SatyamAI Credit Balance*
+
+• *Total Credits:* ${balance}
+• *Available Credits:* ${available}
+• *Cost per Check:* 1 Credit (Text / URL), 2 Credits (Screenshot)
+
+Every new account receives 3 free credits upon signup. Additional credit packages can be purchased via PayPal Sandbox.`;
 }
 
 function formatScamVerdict(verdict: ScamVerdict): string {

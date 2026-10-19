@@ -134,6 +134,42 @@ The migration report says the repository was moved to a full-stack Next.js App R
 
 **Gate:** feature is real, tested, documented, and does not regress core functionality. (PASS - Telegram MVP Verified)
 
+## Phase 9 — PayPal Sandbox & Credit Monetization Engine
+**Priority:** Hackathon Requirement (P0 / Differentiator)  
+**Status:** Completed & Verified (2026-10-19)
+
+- [x] **Credit-Based Freemium Model:**
+  - Eligible new users receive exactly 3 free verification credits on first initialization (`getOrCreateUser`).
+  - Strict idempotency: repeated page reloads, sign-ins, and duplicate requests never grant free credits twice.
+  - Configurable verification costs: 1 credit per Text analysis, 1 credit per URL analysis, and 2 credits per Screenshot OCR analysis (`CREDIT_COSTS`).
+  - Atomic two-phase reservation & commit lifecycle: credits are reserved prior to analysis execution and committed only on success; on analysis failure or provider crash, reserved credits are immediately released back to the user (`creditGuard.ts`).
+  - Concurrent request mutexes prevent double-spending or race conditions.
+  - Client balances cannot be manipulated; the server ledger is authoritative at all times.
+- [x] **PayPal Sandbox Integration:**
+  - Official PayPal Orders v2 and OAuth 2.0 client credentials integration (`src/lib/payments/paypalClient.ts`).
+  - Sandbox-first default mode (`PAYPAL_ENV=sandbox`, `https://api-m.sandbox.paypal.com`) with zero risk to customer funds.
+  - Server-side order creation (`POST /api/v1/payments/create-order`) and server-side capture verification (`POST /api/v1/payments/capture-order`).
+  - Strict validation of order status (`COMPLETED`), currency (`USD`), amount, merchant/payee, and package matching.
+  - Webhook processing with cryptographic signature verification (`POST /api/v1/payments/webhook`) supporting `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.REFUNDED`, and `PAYMENT.CAPTURE.REVERSED`.
+  - Idempotent order capture tracking prevents re-crediting the same order or webhook twice.
+  - Safe refund handling: deducts refunded credits without driving user balance below zero.
+- [x] **Configurable Sandbox Purchase Packages:**
+  - Starter Package: 10 Credits for $2.00 USD.
+  - Plus Package (Popular): 30 Credits for $5.00 USD.
+  - Pro Security Package: 100 Credits for $12.00 USD.
+- [x] **Persistent Transaction Ledger & Audit Journal:**
+  - Durable append-only journal (`.data/credit_ledger.jsonl`) recording timestamp, transaction type, amount, balanceAfter, reference, and reason (`src/lib/payments/ledger.ts`).
+  - Chronological transaction audit endpoint (`GET /api/v1/payments/transactions`).
+- [x] **Front-End User Journey & Active Protection:**
+  - Persistent verification credit status badge in UI with Top-Up and Ledger triggers.
+  - Cost indicators on all input tabs and pre-submission cost clarity.
+  - Seamless PayPal Sandbox checkout modal with live capture and feedback.
+  - Full transaction ledger modal displaying complete history.
+  - Essential Scam Safety Guidance Card: Preserves vital scam defense rules (Helpline 1930, never share OTP/UPI PIN, no digital arrest) even when credits are exhausted.
+- [x] 14 focused automated tests in `tests/paymentsMonetization.test.ts` (196 total repository tests passing across 17 suites).
+
+**Gate:** Credit freemium model and PayPal Sandbox purchase flow are real, atomic, idempotent, auditable, and verified end-to-end without regressing core analysis. (PASS - Phase 9 Verified)
+
 ## Submission buffer — Nov 13–14
 
 - [ ] Fix critical/submission-blocking bugs only.

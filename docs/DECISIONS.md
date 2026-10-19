@@ -147,5 +147,27 @@ Record material decisions so the solo developer and coding agent can understand 
   5. **Dual-Verdict Output:** Formats separate Scam Risk and Factual Claim assessments with citations and Helpline 1930 prompts.
   6. **Privacy by Default:** Zero message persistence; logs are stripped of credentials and sensitive content.
 
+## D-017 — Phase 9: PayPal Sandbox Integration & Credit-Based Freemium Ledger
+- **Date:** 2026-10-19
+- **Status:** Implemented and Verified
+- **Decision:** Implement a server-controlled credit-based freemium model and PayPal Sandbox integration without introducing external microservices or heavy SQL databases:
+  1. **Idempotent Freemium Grant (`src/lib/payments/ledger.ts`):** Each eligible new user receives 3 free verification credits exactly once on their initial request. Repeated sign-ins, page reloads, and webhook retries cannot grant additional free credits.
+  2. **Two-Phase Reservation & Commit Lifecycle (`src/lib/payments/creditGuard.ts`):**
+     - Credits are reserved atomically before pipeline execution (`reserveCredits`), decrementing available balance while locking total balance.
+     - On analysis success: credits are committed (`commitReservation`) and debited.
+     - On analysis failure or provider timeout: reserved credits are immediately released back to the user (`releaseReservation`).
+     - Race-Condition Protection: Per-user asynchronous mutex locks serialize concurrent requests to prevent double-spending.
+  3. **Official PayPal Sandbox Integration (`src/lib/payments/paypalClient.ts`):**
+     - Server-side OAuth 2.0 access-token acquisition with token caching.
+     - PayPal Orders v2 API checkout creation (`POST /api/v1/payments/create-order`) and capture verification (`POST /api/v1/payments/capture-order`).
+     - Strict verification: matches captured status (`COMPLETED`), amount, currency (`USD`), and package configuration.
+     - Webhook handler (`POST /api/v1/payments/webhook`) with cryptographic signature check (`verifyWebhookSignature`).
+     - Safe refund reconciliation: reduces credit balances on `PAYMENT.CAPTURE.REFUNDED` while bounding balances at 0.
+  4. **Durable Append-Only Transaction Journal:**
+     - Journaled transactions (`.data/credit_ledger.jsonl`) record transaction ID, user ID, timestamp, type, amount, balanceAfter, reference, and reason.
+  5. **Active Protection UX:**
+     - Credit exhaustion never leaves users defenseless: the Essential Scam Safety Guidance card is rendered prominently, delivering vital Indian cybercrime rules (Helpline 1930, never share OTP/UPI PIN, no digital arrest) with direct links to the national reporting portal.
+
+
 
 

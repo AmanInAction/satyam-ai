@@ -71,6 +71,35 @@ SatyamAI includes a production-grade Telegram Bot Webhook endpoint reusing the c
   - Per-Chat Rate Limiting: 30 requests/minute.
   - Zero raw message persistence.
 
+## PayPal Sandbox & Credit Monetization Engine
+
+SatyamAI implements an idempotent credit-based freemium architecture and official PayPal Sandbox integration:
+
+- **Freemium Initial Grant:**
+  - Every eligible new user automatically receives **3 free verification credits**, granted exactly once.
+  - Idempotent: Repeated sign-ins, page reloads, and webhook retries never grant additional free credits.
+- **Verification Credit Costs:**
+  - Text message or viral claim check: **1 credit**.
+  - Website link or URL inspection: **1 credit**.
+  - Screenshot image OCR verification: **2 credits**.
+- **PayPal Sandbox Purchase Packages:**
+  - **Starter Package:** 10 Credits for $2.00 USD.
+  - **Plus Package (Popular):** 30 Credits for $5.00 USD.
+  - **Pro Security Package:** 100 Credits for $12.00 USD.
+- **Durable Credit Ledger:**
+  - Durable append-only journal (`.data/credit_ledger.jsonl`) recording chronological balance changes, references, and reasons.
+  - Two-Phase Reservation & Commit: Credits are reserved prior to analysis execution and committed only upon success. On pipeline or provider failure, reserved credits are immediately restored.
+  - Concurrent Mutex Locks: Prevents race conditions or double-spending.
+  - PayPal Webhook Idempotency: Duplicate payment callbacks or webhooks cannot grant credits twice.
+- **Active Scam Defense Guarantee:**
+  - When credits are exhausted, SatyamAI's **Essential Scam Safety Guidance Card** activates, ensuring Indian users never lose access to critical cybercrime prevention guidance (National Cyber Crime Helpline 1930, never share OTP/UPI PIN, and no digital arrest).
+- **Environment Configuration:**
+  - `PAYPAL_CLIENT_ID`: PayPal Developer Sandbox App Client ID.
+  - `PAYPAL_CLIENT_SECRET`: PayPal Developer Sandbox Secret.
+  - `PAYPAL_WEBHOOK_ID`: PayPal Webhook ID for signature verification.
+  - `PAYPAL_ENV`: Defaults to `sandbox` (`api-m.sandbox.paypal.com`).
+  - Simulation Mode: When credentials are unconfigured in test/dev environments, safe sandbox simulation enables end-to-end checkout, capture, and verification without failing.
+
 ## Agent rules
 
 Read the docs above, inspect current code, map requirements to implemented/partial/missing/blocked/deferred, then work on the highest-priority missing requirement. Update docs when schemas or decisions change. Report actual test outcomes and limitations honestly.

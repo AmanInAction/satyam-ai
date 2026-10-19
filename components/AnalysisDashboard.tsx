@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ShieldAlert,
   ShieldCheck,
@@ -33,6 +33,7 @@ import {
   FileSearch,
   Edit3,
   Eye,
+  Coins,
 } from 'lucide-react';
 import {
   AnalysisResponse,
@@ -41,6 +42,9 @@ import {
   RiskLevel,
   AnalysisType,
 } from '../src/lib/validation/schemas';
+import { CreditBar, EssentialSafetyGuidanceCard } from './CreditBar';
+import { CreditModals } from './CreditModals';
+import { CreditPackage, CreditTransaction } from '@/src/lib/payments/types';
 
 interface PresetScenario {
   id: string;
@@ -284,6 +288,106 @@ export default function AnalysisDashboard() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // Credit & Monetization state
+  const [creditBalance, setCreditBalance] = useState<number>(3);
+  const [creditAvailable, setCreditAvailable] = useState<number>(3);
+  const [creditPackages, setCreditPackages] = useState<CreditPackage[]>([]);
+  const [isCreditsLoading, setIsCreditsLoading] = useState<boolean>(true);
+  const [isCreditsExhausted, setIsCreditsExhausted] = useState<boolean>(false);
+  const [isTopUpOpen, setIsTopUpOpen] = useState<boolean>(false);
+  const [isLedgerOpen, setIsLedgerOpen] = useState<boolean>(false);
+  const [transactions, setTransactions] = useState<CreditTransaction[]>([]);
+  const [isLedgerLoading, setIsLedgerLoading] = useState<boolean>(false);
+  const [isPurchasing, setIsPurchasing] = useState<string | null>(null);
+  const [purchaseSuccess, setPurchaseSuccess] = useState<string | null>(null);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
+
+  const fetchCredits = useCallback(async () => {
+    try {
+      const res = await fetch('/api/v1/payments/credits');
+      if (res.ok) {
+        const data = await res.json();
+        setCreditBalance(data.balance ?? 3);
+        setCreditAvailable(data.available ?? 3);
+        if (data.packages) setCreditPackages(data.packages);
+        if (typeof data.available === 'number' && data.available <= 0) {
+          setIsCreditsExhausted(true);
+        } else {
+          setIsCreditsExhausted(false);
+        }
+      }
+    } catch {
+      // Fallback to default initial 3
+    } finally {
+      setIsCreditsLoading(false);
+    }
+  }, []);
+
+  const fetchTransactions = useCallback(async () => {
+    setIsLedgerLoading(true);
+    try {
+      const res = await fetch('/api/v1/payments/transactions');
+      if (res.ok) {
+        const data = await res.json();
+        setTransactions(data.transactions || []);
+        if (typeof data.balance === 'number') setCreditBalance(data.balance);
+        if (typeof data.available === 'number') setCreditAvailable(data.available);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setIsLedgerLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCredits();
+  }, [fetchCredits]);
+
+  const handlePurchasePackage = async (packageId: string) => {
+    setIsPurchasing(packageId);
+    setPurchaseError(null);
+    setPurchaseSuccess(null);
+
+    try {
+      // 1. Create order
+      const createRes = await fetch('/api/v1/payments/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ packageId }),
+      });
+      const orderData = await createRes.json();
+      if (!createRes.ok) {
+        throw new Error(orderData?.error?.message || 'Failed to create PayPal order.');
+      }
+
+      // 2. Capture order
+      const captureRes = await fetch('/api/v1/payments/capture-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: orderData.orderId,
+          packageId,
+        }),
+      });
+      const captureData = await captureRes.json();
+      if (!captureRes.ok) {
+        throw new Error(captureData?.error?.message || 'Failed to capture PayPal order.');
+      }
+
+      setPurchaseSuccess(`Payment captured! +${captureData.creditsAdded} credits added to your account.`);
+      setCreditBalance(captureData.newBalance);
+      setCreditAvailable(captureData.newBalance);
+      setIsCreditsExhausted(false);
+      setErrorMessage(null);
+      await fetchTransactions();
+    } catch (err: unknown) {
+      setPurchaseError((err as Error)?.message || 'Payment capture failed. Please try again.');
+    } finally {
+      setIsPurchasing(null);
+    }
+  };
+
   const handleSelectTextPreset = (preset: PresetScenario) => {
     setInputText(preset.text);
     setLanguageHint(preset.languageHint);
@@ -380,6 +484,13 @@ Helpline (India): 1930 | cybercrime.gov.in`;
       return;
     }
 
+    if (creditAvailable < 1) {
+      setIsCreditsExhausted(true);
+      setErrorMessage('Insufficient credits. Text analysis requires 1 credit. Please top up via PayPal Sandbox.');
+      setIsTopUpOpen(true);
+      return;
+    }
+
     setIsLoading(true);
     setErrorMessage(null);
 
@@ -396,12 +507,24 @@ Helpline (India): 1930 | cybercrime.gov.in`;
       const data = await response.json();
 
       if (!response.ok) {
-        setErrorMessage(data?.error?.message || 'Failed to complete analysis. Please try again.');
+        if (response.status === 402 || data?.error?.code === 'INSUFFICIENT_CREDITS') {
+          setIsCreditsExhausted(true);
+          setCreditAvailable(0);
+          setErrorMessage('Credits exhausted! Each new user receives 3 free credits. Please top up with PayPal Sandbox or consult our essential safety advice below.');
+        } else {
+          setErrorMessage(data?.error?.message || 'Failed to complete analysis. Please try again.');
+        }
         setIsLoading(false);
         return;
       }
 
       setResult(data as AnalysisResponse);
+      if (typeof data?.credits?.remaining === 'number') {
+        setCreditAvailable(data.credits.remaining);
+        setCreditBalance(data.credits.remaining);
+      } else {
+        setCreditAvailable((prev) => Math.max(0, prev - 1));
+      }
     } catch {
       setErrorMessage('Network connection error. Please ensure the server is active.');
     } finally {
@@ -413,6 +536,13 @@ Helpline (India): 1930 | cybercrime.gov.in`;
     if (e) e.preventDefault();
     if (!inputUrl.trim()) {
       setErrorMessage('Please enter a URL to analyze.');
+      return;
+    }
+
+    if (creditAvailable < 1) {
+      setIsCreditsExhausted(true);
+      setErrorMessage('Insufficient credits. URL analysis requires 1 credit. Please top up via PayPal Sandbox.');
+      setIsTopUpOpen(true);
       return;
     }
 
@@ -431,12 +561,24 @@ Helpline (India): 1930 | cybercrime.gov.in`;
       const data = await response.json();
 
       if (!response.ok) {
-        setErrorMessage(data?.error?.message || 'Failed to complete URL analysis. Please try again.');
+        if (response.status === 402 || data?.error?.code === 'INSUFFICIENT_CREDITS') {
+          setIsCreditsExhausted(true);
+          setCreditAvailable(0);
+          setErrorMessage('Credits exhausted! Each new user receives 3 free credits. Please top up with PayPal Sandbox or consult our essential safety advice below.');
+        } else {
+          setErrorMessage(data?.error?.message || 'Failed to complete URL analysis. Please try again.');
+        }
         setIsLoading(false);
         return;
       }
 
       setResult(data as AnalysisResponse);
+      if (typeof data?.credits?.remaining === 'number') {
+        setCreditAvailable(data.credits.remaining);
+        setCreditBalance(data.credits.remaining);
+      } else {
+        setCreditAvailable((prev) => Math.max(0, prev - 1));
+      }
     } catch {
       setErrorMessage('Network connection error. Please ensure the server is active.');
     } finally {
@@ -448,6 +590,13 @@ Helpline (India): 1930 | cybercrime.gov.in`;
     if (e) e.preventDefault();
     if (!selectedImageFile) {
       setErrorMessage('Please select or upload a screenshot file to inspect.');
+      return;
+    }
+
+    if (creditAvailable < 2) {
+      setIsCreditsExhausted(true);
+      setErrorMessage('Insufficient credits. Screenshot OCR analysis requires 2 credits. Please top up via PayPal Sandbox.');
+      setIsTopUpOpen(true);
       return;
     }
 
@@ -467,7 +616,13 @@ Helpline (India): 1930 | cybercrime.gov.in`;
       const data = await response.json();
 
       if (!response.ok) {
-        setErrorMessage(data?.error?.message || 'Failed to analyze screenshot. Please try again.');
+        if (response.status === 402 || data?.error?.code === 'INSUFFICIENT_CREDITS') {
+          setIsCreditsExhausted(true);
+          setCreditAvailable(0);
+          setErrorMessage('Credits exhausted! Screenshot analysis requires 2 credits. Please top up with PayPal Sandbox or consult our essential safety advice below.');
+        } else {
+          setErrorMessage(data?.error?.message || 'Failed to analyze screenshot. Please try again.');
+        }
         setIsLoading(false);
         return;
       }
@@ -475,6 +630,12 @@ Helpline (India): 1930 | cybercrime.gov.in`;
       setResult(data as AnalysisResponse);
       setExtractedReviewText(data.extracted_text || '');
       setIsEditingExtractedText(false);
+      if (typeof data?.credits?.remaining === 'number') {
+        setCreditAvailable(data.credits.remaining);
+        setCreditBalance(data.credits.remaining);
+      } else {
+        setCreditAvailable((prev) => Math.max(0, prev - 2));
+      }
     } catch {
       setErrorMessage('Network connection error. Please ensure the server is active.');
     } finally {
@@ -485,6 +646,13 @@ Helpline (India): 1930 | cybercrime.gov.in`;
   const handleReanalyzeEditedText = async () => {
     if (!extractedReviewText.trim()) {
       setErrorMessage('Extracted text cannot be empty.');
+      return;
+    }
+
+    if (creditAvailable < 1) {
+      setIsCreditsExhausted(true);
+      setErrorMessage('Insufficient credits. Re-evaluating text requires 1 credit. Please top up via PayPal Sandbox.');
+      setIsTopUpOpen(true);
       return;
     }
 
@@ -504,7 +672,13 @@ Helpline (India): 1930 | cybercrime.gov.in`;
       const data = await response.json();
 
       if (!response.ok) {
-        setErrorMessage(data?.error?.message || 'Failed to re-analyze refined text.');
+        if (response.status === 402 || data?.error?.code === 'INSUFFICIENT_CREDITS') {
+          setIsCreditsExhausted(true);
+          setCreditAvailable(0);
+          setErrorMessage('Credits exhausted! Please top up via PayPal Sandbox.');
+        } else {
+          setErrorMessage(data?.error?.message || 'Failed to re-analyze refined text.');
+        }
         setIsLoading(false);
         return;
       }
@@ -518,6 +692,12 @@ Helpline (India): 1930 | cybercrime.gov.in`;
 
       setResult(updatedResponse);
       setIsEditingExtractedText(false);
+      if (typeof data?.credits?.remaining === 'number') {
+        setCreditAvailable(data.credits.remaining);
+        setCreditBalance(data.credits.remaining);
+      } else {
+        setCreditAvailable((prev) => Math.max(0, prev - 1));
+      }
     } catch {
       setErrorMessage('Network connection error while re-evaluating refined text.');
     } finally {
@@ -643,6 +823,23 @@ Helpline (India): 1930 | cybercrime.gov.in`;
 
   return (
     <div className="space-y-8">
+      {/* Persistent Credit Balance & Action Bar */}
+      <CreditBar
+        balance={creditBalance}
+        available={creditAvailable}
+        isLoading={isCreditsLoading}
+        onOpenTopUp={() => setIsTopUpOpen(true)}
+        onOpenLedger={() => {
+          fetchTransactions();
+          setIsLedgerOpen(true);
+        }}
+      />
+
+      {/* Emergency Scam Safety Guidance when Credits are Exhausted */}
+      {isCreditsExhausted && (
+        <EssentialSafetyGuidanceCard onOpenTopUp={() => setIsTopUpOpen(true)} />
+      )}
+
       {/* Mode Switch Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
         <button
@@ -659,6 +856,9 @@ Helpline (India): 1930 | cybercrime.gov.in`;
         >
           <FileText className="w-3.5 h-3.5" />
           <span>Analyze Message / Claim</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-black/20 font-mono text-slate-300">
+            1 Credit
+          </span>
         </button>
 
         <button
@@ -675,6 +875,9 @@ Helpline (India): 1930 | cybercrime.gov.in`;
         >
           <Globe className="w-3.5 h-3.5" />
           <span>Analyze Link / URL</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-black/20 font-mono text-slate-300">
+            1 Credit
+          </span>
         </button>
 
         <button
@@ -691,6 +894,9 @@ Helpline (India): 1930 | cybercrime.gov.in`;
         >
           <ImageIcon className="w-3.5 h-3.5" />
           <span>Inspect Screenshot / OCR</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-black/20 font-mono text-slate-300">
+            2 Credits
+          </span>
         </button>
       </div>
 
@@ -1058,10 +1264,18 @@ Helpline (India): 1930 | cybercrime.gov.in`;
       {result && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
           {/* Result Actions Bar */}
-          <div className="flex items-center justify-between px-1">
-            <span className="text-xs font-mono text-slate-500">
-              Analysis ID: <strong className="text-slate-400">{result.analysis_id}</strong> ({result.input_type.toUpperCase()})
-            </span>
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-xs font-mono text-slate-500">
+                Analysis ID: <strong className="text-slate-400">{result.analysis_id}</strong> ({result.input_type.toUpperCase()})
+              </span>
+              {(result as any)?.credits && (
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center gap-1">
+                  <Coins className="w-3 h-3 text-blue-400" />
+                  <span>Cost: {(result as any).credits.cost} credit | Remaining: {(result as any).credits.remaining}</span>
+                </span>
+              )}
+            </div>
             <button
               type="button"
               onClick={handleCopyReport}
@@ -1484,6 +1698,24 @@ Helpline (India): 1930 | cybercrime.gov.in`;
           </div>
         </div>
       )}
+
+      {/* Credit Purchase & Transaction Ledger Modals */}
+      <CreditModals
+        isTopUpOpen={isTopUpOpen}
+        isLedgerOpen={isLedgerOpen}
+        onCloseTopUp={() => setIsTopUpOpen(false)}
+        onCloseLedger={() => setIsLedgerOpen(false)}
+        balance={creditBalance}
+        available={creditAvailable}
+        packages={creditPackages}
+        onPurchase={handlePurchasePackage}
+        isPurchasing={isPurchasing}
+        purchaseSuccess={purchaseSuccess}
+        purchaseError={purchaseError}
+        transactions={transactions}
+        isLedgerLoading={isLedgerLoading}
+        onRefreshLedger={fetchTransactions}
+      />
     </div>
   );
 }

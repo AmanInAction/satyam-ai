@@ -254,3 +254,149 @@ Main update handler receiving Telegram Bot API Webhook updates.
   - `401 UNAUTHORIZED_WEBHOOK`: Secret token mismatch.
   - `400 INVALID_JSON`: Malformed update payload.
 
+## Payment & Credit Monetization Endpoints
+
+### 1. `GET /api/v1/payments/credits`
+Retrieves current user credit balance, operation costs, and available PayPal purchase packages. Idempotently grants 3 free credits to new users on initial request.
+- **Headers:** Optional `X-User-Id` (or session cookie `satyam_user_id`).
+- **Response `200 OK`:**
+```json
+{
+  "userId": "usr_9f81a7b_k2x89z",
+  "balance": 3,
+  "reserved": 0,
+  "available": 3,
+  "hasReceivedFreeGrant": true,
+  "transactionsCount": 1,
+  "costs": {
+    "text": 1,
+    "url": 1,
+    "image": 2
+  },
+  "packages": [
+    {
+      "id": "starter",
+      "name": "Starter Package",
+      "nameHi": "स्टार्टर पैक",
+      "credits": 10,
+      "price": "2.00",
+      "currency": "USD",
+      "description": "10 Verification Credits for suspicious messages & URLs",
+      "popular": false
+    },
+    {
+      "id": "plus",
+      "name": "Plus Package",
+      "nameHi": "प्लस पैक",
+      "credits": 30,
+      "price": "5.00",
+      "currency": "USD",
+      "description": "30 Verification Credits (Best Value for Family Protection)",
+      "popular": true
+    },
+    {
+      "id": "pro",
+      "name": "Pro Security Package",
+      "nameHi": "प्रो सुरक्षा पैक",
+      "credits": 100,
+      "price": "12.00",
+      "currency": "USD",
+      "description": "100 Verification Credits for high-volume community checking",
+      "popular": false
+    }
+  ],
+  "paypal": {
+    "isConfigured": false,
+    "isSandbox": true
+  }
+}
+```
+
+### 2. `POST /api/v1/payments/create-order`
+Creates a PayPal checkout order for a configured credit package.
+- **Request:**
+```json
+{
+  "packageId": "plus"
+}
+```
+- **Response `200 OK`:**
+```json
+{
+  "orderId": "SIM_ORDER_1792411819916_AF3O4",
+  "packageId": "plus",
+  "amount": "5.00",
+  "currency": "USD",
+  "status": "CREATED",
+  "approvalUrl": "https://www.sandbox.paypal.com/checkoutnow?token=SIM_ORDER_1792411819916_AF3O4",
+  "simulated": true
+}
+```
+
+### 3. `POST /api/v1/payments/capture-order`
+Captures an approved PayPal order and idempotently credits the user's ledger.
+- **Request:**
+```json
+{
+  "orderId": "SIM_ORDER_1792411819916_AF3O4",
+  "packageId": "plus"
+}
+```
+- **Response `200 OK`:**
+```json
+{
+  "success": true,
+  "orderId": "SIM_ORDER_1792411819916_AF3O4",
+  "packageId": "plus",
+  "creditsAdded": 30,
+  "newBalance": 33,
+  "captureId": "SIM_CAPTURE_1792411819932_OEPST"
+}
+```
+
+### 4. `GET /api/v1/payments/transactions`
+Returns the chronological transaction history from the durable credit ledger.
+- **Headers:** Optional `X-User-Id` (or session cookie `satyam_user_id`).
+- **Response `200 OK`:**
+```json
+{
+  "userId": "usr_9f81a7b_k2x89z",
+  "balance": 33,
+  "available": 33,
+  "transactions": [
+    {
+      "id": "tx_1792411819910_A1B2",
+      "userId": "usr_9f81a7b_k2x89z",
+      "timestamp": "2026-10-19T12:10:19.910Z",
+      "type": "initial_grant",
+      "amount": 3,
+      "balanceAfter": 3,
+      "reason": "Welcome freemium credit grant (3 free credits)",
+      "metadata": { "packageId": "free_grant" }
+    },
+    {
+      "id": "tx_1792411819930_C3D4",
+      "userId": "usr_9f81a7b_k2x89z",
+      "timestamp": "2026-10-19T12:10:19.930Z",
+      "type": "purchase_credit",
+      "amount": 30,
+      "balanceAfter": 33,
+      "reason": "Purchased Plus Package (30 credits) via PayPal Sandbox",
+      "metadata": {
+        "orderId": "SIM_ORDER_1792411819916_AF3O4",
+        "captureId": "SIM_CAPTURE_1792411819932_OEPST",
+        "packageId": "plus",
+        "price": "5.00",
+        "currency": "USD"
+      }
+    }
+  ]
+}
+```
+
+### 5. `POST /api/v1/payments/webhook`
+Webhook endpoint receiving verified PayPal event notifications (`PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.REFUNDED`, `PAYMENT.CAPTURE.REVERSED`).
+- **Security:** Verified with PayPal webhook signature (`verifyWebhookSignature`).
+- **Idempotency:** Webhook events are processed idempotently; duplicate events return `200 OK` with `already_processed: true`.
+
+
