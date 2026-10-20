@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Local environment
+.env*
+!.env.example
+
+# Local application data
+.data/
+
+# Build and test output
+dist/
+coverage/
+*.tsbuildinfo
+*.log
