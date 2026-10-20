@@ -68,20 +68,36 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Derive default return and cancel URLs if not provided
+  const host = req.headers.get('host') || 'localhost:3000';
+  const proto = req.headers.get('x-forwarded-proto') || 'http';
+  const origin = `${proto}://${host}`;
+  const effectiveReturnUrl =
+    returnUrl || `${origin}/analyze?paypal_return=true&package_id=${packageId}`;
+  const effectiveCancelUrl =
+    cancelUrl || `${origin}/analyze?paypal_cancel=true&package_id=${packageId}`;
+
   try {
     const order = await defaultPayPalClient.createOrder(
       packageId,
       sessionInfo.userId,
-      returnUrl,
-      cancelUrl
+      effectiveReturnUrl,
+      effectiveCancelUrl
     );
 
-    safeLogger.info(`Created PayPal order ${order.id} for user ${sessionInfo.userId} (package ${packageId})`);
+    const approveLink = order.links?.find((l) => l.rel === 'approve');
+    const approveUrl = order.approvalUrl || order.approveUrl || approveLink?.href || null;
+
+    safeLogger.info(
+      `Created PayPal order ${order.id} for user ${sessionInfo.userId} (package ${packageId}, approveUrl: ${approveUrl ? 'present' : 'none'})`
+    );
 
     const response = NextResponse.json({
       orderId: order.id,
       status: order.status,
       links: order.links,
+      approveUrl,
+      approvalUrl: approveUrl,
       package: pkg,
       isSandbox: !defaultPayPalClient.isConfigured() || process.env.PAYPAL_ENV !== 'production',
     });

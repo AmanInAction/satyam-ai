@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { defaultPayPalClient } from '@/src/lib/payments/paypalClient';
+import { defaultPayPalClient, PayPalApiError } from '@/src/lib/payments/paypalClient';
 import { defaultCreditLedger } from '@/src/lib/payments/ledger';
 import { getCreditPackageById } from '@/src/lib/payments/config';
 import { getUserIdFromRequest, attachUserSessionHeaders } from '@/src/lib/payments/userSession';
@@ -102,6 +102,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (capturedCurrency && capturedCurrency !== pkg.currency) {
+      safeLogger.error(
+        `Currency manipulation detected: order ${orderId} captured ${capturedCurrency}, expected ${pkg.currency}`
+      );
+      return createErrorResponse(
+        400,
+        'CURRENCY_MISMATCH',
+        'Captured payment currency does not match the package currency.',
+        requestId
+      );
+    }
+
     // 5. Idempotently add purchased credits to ledger
     const creditResult = await defaultCreditLedger.addPurchaseCredits(
       sessionInfo.userId,
@@ -129,6 +141,46 @@ export async function POST(req: NextRequest) {
 
     return attachUserSessionHeaders(response, sessionInfo);
   } catch (err: unknown) {
+    if (err instanceof PayPalApiError) {
+      safeLogger.warn(
+        `PayPal API error during capture: status=${err.statusCode}, issue=${err.issueCode}, message=${err.message}`
+      );
+
+      if (err.issueCode === 'ORDER_NOT_APPROVED' || err.statusCode === 422) {
+        return createErrorResponse(
+          422,
+          'ORDER_NOT_APPROVED',
+          'Order has not been approved by the buyer. Please complete approval at PayPal before capturing.',
+          requestId
+        );
+      }
+
+      if (err.issueCode === 'ORDER_CANCELLED') {
+        return createErrorResponse(
+          422,
+          'ORDER_CANCELLED',
+          'Order was cancelled by the buyer.',
+          requestId
+        );
+      }
+
+      if (err.issueCode === 'RESOURCE_NOT_FOUND' || err.statusCode === 404) {
+        return createErrorResponse(
+          404,
+          'ORDER_NOT_FOUND',
+          'PayPal order not found.',
+          requestId
+        );
+      }
+
+      return createErrorResponse(
+        err.statusCode || 400,
+        err.issueCode || 'PAYMENT_CAPTURE_ERROR',
+        err.message || 'PayPal payment capture failed.',
+        requestId
+      );
+    }
+
     safeLogger.error(`Error capturing PayPal order ${orderId}: ${(err as Error)?.message}`, {
       requestId,
     });

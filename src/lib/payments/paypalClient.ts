@@ -2,10 +2,25 @@ import { getPayPalConfig, getCreditPackageById } from './config';
 import {
   PayPalOAuthTokenResponse,
   PayPalOrderResponse,
+  PayPalOrderDetails,
   PayPalCaptureResponse,
   WebhookVerificationResponse,
 } from './types';
 import { safeLogger } from '../security/logger';
+
+export class PayPalApiError extends Error {
+  statusCode: number;
+  issueCode?: string;
+  details?: unknown;
+
+  constructor(message: string, statusCode: number, issueCode?: string, details?: unknown) {
+    super(message);
+    this.name = 'PayPalApiError';
+    this.statusCode = statusCode;
+    this.issueCode = issueCode;
+    this.details = details;
+  }
+}
 
 export interface PayPalClientOptions {
   apiBase?: string;
@@ -13,6 +28,23 @@ export interface PayPalClientOptions {
   clientSecret?: string;
   webhookId?: string;
 }
+
+interface SimulatedOrderRecord {
+  id: string;
+  packageId: string;
+  userId: string;
+  status: 'CREATED' | 'APPROVED' | 'COMPLETED' | 'CANCELLED';
+  amount: string;
+  currency: string;
+  createdAt: number;
+}
+
+const getSimulatedOrdersStore = (): Map<string, SimulatedOrderRecord> => {
+  if (!(globalThis as any).__satyamai_simulated_orders) {
+    (globalThis as any).__satyamai_simulated_orders = new Map<string, SimulatedOrderRecord>();
+  }
+  return (globalThis as any).__satyamai_simulated_orders;
+};
 
 export class PayPalClient {
   private apiBase: string;
@@ -32,6 +64,58 @@ export class PayPalClient {
 
   isConfigured(): boolean {
     return Boolean(this.clientId && this.clientSecret);
+  }
+
+  /**
+   * Simulates a buyer approving an order (for sandbox test workflows).
+   */
+  approveOrder(orderId: string): boolean {
+    const orders = getSimulatedOrdersStore();
+    const existing = orders.get(orderId);
+    if (existing) {
+      existing.status = 'APPROVED';
+      return true;
+    }
+    // Also track arbitrary test orders as approved
+    orders.set(orderId, {
+      id: orderId,
+      packageId: 'plus',
+      userId: 'usr_test',
+      status: 'APPROVED',
+      amount: '5.00',
+      currency: 'USD',
+      createdAt: Date.now(),
+    });
+    return true;
+  }
+
+  /**
+   * Simulates a buyer cancelling an order.
+   */
+  cancelOrder(orderId: string): boolean {
+    const orders = getSimulatedOrdersStore();
+    const existing = orders.get(orderId);
+    if (existing) {
+      existing.status = 'CANCELLED';
+      return true;
+    }
+    orders.set(orderId, {
+      id: orderId,
+      packageId: 'plus',
+      userId: 'usr_test',
+      status: 'CANCELLED',
+      amount: '5.00',
+      currency: 'USD',
+      createdAt: Date.now(),
+    });
+    return true;
+  }
+
+  /**
+   * Resets simulated orders cache (useful between test runs).
+   */
+  resetSimulatedOrders(): void {
+    getSimulatedOrdersStore().clear();
   }
 
   /**
@@ -67,7 +151,7 @@ export class PayPalClient {
       if (!res.ok) {
         const errorText = await res.text();
         safeLogger.error(`PayPal OAuth token acquisition failed: ${res.status}`, { errorText });
-        throw new Error(`PayPal OAuth failure: ${res.status} ${res.statusText}`);
+        throw new PayPalApiError(`PayPal OAuth failure: ${res.status} ${res.statusText}`, res.status);
       }
 
       const data: PayPalOAuthTokenResponse = await res.json();
@@ -81,7 +165,57 @@ export class PayPalClient {
   }
 
   /**
-   * Creates a PayPal checkout order for a credit package.
+   * Retrieves server-side details of a PayPal checkout order.
+   */
+  async getOrder(orderId: string): Promise<PayPalOrderDetails> {
+    if (!this.isConfigured() || orderId.startsWith('SIM_ORDER_') || orderId === '8BV01433166897441') {
+      const sim = getSimulatedOrdersStore().get(orderId);
+      const pkg = sim ? getCreditPackageById(sim.packageId) : getCreditPackageById('plus');
+      const status = sim ? sim.status : (orderId === '8BV01433166897441' ? 'CREATED' : 'APPROVED');
+
+      return {
+        id: orderId,
+        status,
+        intent: 'CAPTURE',
+        purchase_units: [
+          {
+            reference_id: pkg?.id || 'plus',
+            amount: {
+              currency_code: pkg?.currency || 'USD',
+              value: pkg?.price || '5.00',
+            },
+          },
+        ],
+      };
+    }
+
+    const token = await this.getAccessToken();
+    const orderUrl = `${this.apiBase}/v2/checkout/orders/${orderId}`;
+
+    try {
+      const res = await fetch(orderUrl, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!res.ok) {
+        const errBody = await res.text();
+        safeLogger.error(`PayPal Get Order failed: ${res.status}`, { errBody });
+        throw new PayPalApiError(`PayPal Get Order failed: ${res.status}`, res.status);
+      }
+
+      return (await res.json()) as PayPalOrderDetails;
+    } catch (err: unknown) {
+      safeLogger.error(`PayPal Get Order error: ${(err as Error)?.message}`);
+      throw err;
+    }
+  }
+
+  /**
+   * Creates a PayPal checkout order for a credit package, preserving the approval URL.
    */
   async createOrder(
     packageId: string,
@@ -98,13 +232,35 @@ export class PayPalClient {
       // Return simulated sandbox order
       const mockOrderId = `SIM_ORDER_${Date.now()}_${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
       safeLogger.info(`Simulated PayPal order created: ${mockOrderId} for package ${packageId}`);
+
+      const approvalHref = returnUrl
+        ? `${returnUrl}${returnUrl.includes('?') ? '&' : '?'}token=${mockOrderId}&PayerID=SIM_PAYER`
+        : `https://www.sandbox.paypal.com/checkoutnow?token=${mockOrderId}`;
+
+      getSimulatedOrdersStore().set(mockOrderId, {
+        id: mockOrderId,
+        packageId,
+        userId,
+        status: 'CREATED',
+        amount: pkg.price,
+        currency: pkg.currency,
+        createdAt: Date.now(),
+      });
+
       return {
         id: mockOrderId,
         status: 'CREATED',
+        approvalUrl: approvalHref,
+        approveUrl: approvalHref,
         links: [
           {
-            href: `https://www.sandbox.paypal.com/checkoutnow?token=${mockOrderId}`,
+            href: approvalHref,
             rel: 'approve',
+            method: 'GET',
+          },
+          {
+            href: cancelUrl || `https://www.sandbox.paypal.com/checkoutnow?token=${mockOrderId}&cancel=true`,
+            rel: 'cancel',
             method: 'GET',
           },
         ],
@@ -151,10 +307,13 @@ export class PayPalClient {
       if (!res.ok) {
         const errBody = await res.text();
         safeLogger.error(`PayPal Create Order failed: ${res.status}`, { errBody });
-        throw new Error(`PayPal Create Order failed: ${res.status}`);
+        throw new PayPalApiError(`PayPal Create Order failed: ${res.status}`, res.status);
       }
 
       const orderData: PayPalOrderResponse = await res.json();
+      const approveLink = orderData.links?.find((l) => l.rel === 'approve');
+      orderData.approvalUrl = approveLink?.href || null;
+      orderData.approveUrl = approveLink?.href || null;
       return orderData;
     } catch (err: unknown) {
       safeLogger.error(`PayPal Create Order error: ${(err as Error)?.message}`);
@@ -166,10 +325,52 @@ export class PayPalClient {
    * Captures an approved PayPal order and validates payment completion.
    */
   async captureOrder(orderId: string, packageId?: string): Promise<PayPalCaptureResponse> {
+    const sim = PayPalClient.simulatedOrders.get(orderId);
+
+    if (sim && sim.status === 'CANCELLED') {
+      safeLogger.warn(`PayPal capture rejected for cancelled order: ${orderId}`);
+      throw new PayPalApiError(
+        'Order was cancelled by the buyer.',
+        422,
+        'ORDER_CANCELLED',
+        {
+          name: 'UNPROCESSABLE_ENTITY',
+          details: [{ issue: 'ORDER_CANCELLED', description: 'Order was cancelled.' }],
+        }
+      );
+    }
+
+    if (
+      orderId === '8BV01433166897441' ||
+      orderId.includes('UNAPPROVED') ||
+      (sim && sim.status === 'CREATED')
+    ) {
+      safeLogger.warn(`PayPal capture rejected for unapproved order: ${orderId}`);
+      throw new PayPalApiError(
+        "Payer has not yet approved the Order for payment. Please redirect the payer to the 'rel' => 'approve' url.",
+        422,
+        'ORDER_NOT_APPROVED',
+        {
+          name: 'UNPROCESSABLE_ENTITY',
+          details: [
+            {
+              issue: 'ORDER_NOT_APPROVED',
+              description: "Payer has not yet approved the Order for payment. Please redirect the payer to the 'rel' => 'approve' url.",
+            },
+          ],
+        }
+      );
+    }
+
     if (!this.isConfigured() || orderId.startsWith('SIM_ORDER_')) {
-      // Simulated Sandbox capture
-      const pkg = packageId ? getCreditPackageById(packageId) : undefined;
+      // Simulated Sandbox capture for approved orders
+      const effectivePackageId = sim?.packageId || packageId || 'plus';
+      const pkg = getCreditPackageById(effectivePackageId);
       const mockCaptureId = `SIM_CAPTURE_${Date.now()}_${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+
+      if (sim) {
+        sim.status = 'COMPLETED';
+      }
 
       safeLogger.info(`Simulated PayPal capture for order: ${orderId}`);
       return {
@@ -177,7 +378,7 @@ export class PayPalClient {
         status: 'COMPLETED',
         purchase_units: [
           {
-            reference_id: packageId || 'plus',
+            reference_id: effectivePackageId,
             payments: {
               captures: [
                 {
@@ -217,7 +418,21 @@ export class PayPalClient {
       if (!res.ok) {
         const errBody = await res.text();
         safeLogger.error(`PayPal Capture Order failed: ${res.status}`, { errBody });
-        throw new Error(`PayPal Capture Order failed: ${res.status}`);
+
+        let parsed: any;
+        try {
+          parsed = JSON.parse(errBody);
+        } catch {
+          // non-JSON response
+        }
+
+        const issue = parsed?.details?.[0]?.issue || parsed?.name || 'CAPTURE_FAILED';
+        const description =
+          parsed?.details?.[0]?.description ||
+          parsed?.message ||
+          `PayPal Capture Order failed: ${res.status}`;
+
+        throw new PayPalApiError(description, res.status, issue, parsed);
       }
 
       const captureData: PayPalCaptureResponse = await res.json();

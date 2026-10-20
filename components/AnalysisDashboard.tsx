@@ -239,8 +239,10 @@ export default function AnalysisDashboard() {
   const [transactions, setTransactions] = useState<CreditTransaction[]>([]);
   const [isLedgerLoading, setIsLedgerLoading] = useState<boolean>(false);
   const [isPurchasing, setIsPurchasing] = useState<string | null>(null);
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState<boolean>(false);
   const [purchaseSuccess, setPurchaseSuccess] = useState<string | null>(null);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
+  const capturedOrdersRef = useRef<Set<string>>(new Set());
 
   const fetchCredits = useCallback(async () => {
     try {
@@ -284,46 +286,154 @@ export default function AnalysisDashboard() {
     fetchCredits();
   }, [fetchCredits]);
 
+  // Handle return from PayPal approval or cancellation
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const isReturn = urlParams.get('paypal_return') === 'true' || urlParams.has('token');
+    const isCancel = urlParams.get('paypal_cancel') === 'true' || urlParams.get('cancel') === 'true';
+    const token = urlParams.get('token') || urlParams.get('order_id') || urlParams.get('orderId');
+    const paramPackageId = urlParams.get('package_id') || urlParams.get('packageId');
+
+    // Retrieve saved pending order from sessionStorage if available
+    let storedPending: { orderId: string; packageId: string } | null = null;
+    try {
+      const stored = sessionStorage.getItem('satyamai_pending_paypal');
+      if (stored) {
+        storedPending = JSON.parse(stored);
+      }
+    } catch {
+      // ignore
+    }
+
+    const effectiveOrderId = token || storedPending?.orderId;
+    const effectivePackageId = paramPackageId || storedPending?.packageId || 'plus';
+
+    if (isCancel) {
+      try {
+        sessionStorage.removeItem('satyamai_pending_paypal');
+      } catch {
+        // ignore
+      }
+      window.history.replaceState({}, '', window.location.pathname);
+      setPurchaseError('Checkout was cancelled. No charges were made.');
+      setIsTopUpOpen(true);
+      return;
+    }
+
+    if (isReturn && effectiveOrderId) {
+      if (capturedOrdersRef.current.has(effectiveOrderId)) {
+        return;
+      }
+      capturedOrdersRef.current.add(effectiveOrderId);
+
+      // Clean URL immediately so refresh won't loop
+      window.history.replaceState({}, '', window.location.pathname);
+
+      setIsVerifyingPayment(true);
+      setIsTopUpOpen(true);
+      setPurchaseError(null);
+      setPurchaseSuccess(null);
+
+      fetch('/api/v1/payments/capture-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: effectiveOrderId,
+          packageId: effectivePackageId,
+        }),
+      })
+        .then(async (res) => {
+          const captureData = await res.json();
+          if (!res.ok) {
+            if (captureData?.error?.code === 'ORDER_NOT_APPROVED') {
+              throw new Error('Payment was not approved at PayPal. No charges were made and no checks were added.');
+            }
+            throw new Error(captureData?.error?.message || 'Payment confirmation failed.');
+          }
+
+          if (captureData.alreadyRedeemed) {
+            setPurchaseSuccess('This payment was already verified and credited to your account.');
+          } else {
+            setPurchaseSuccess(`Payment confirmed! +${captureData.creditsGranted} checks added to your account.`);
+          }
+
+          if (typeof captureData.currentBalance === 'number') {
+            setCreditBalance(captureData.currentBalance);
+            setCreditAvailable(captureData.available ?? captureData.currentBalance);
+            if (captureData.available > 0) {
+              setIsCreditsExhausted(false);
+            }
+          }
+          try {
+            sessionStorage.removeItem('satyamai_pending_paypal');
+          } catch {
+            // ignore
+          }
+          await fetchTransactions();
+        })
+        .catch((err: unknown) => {
+          try {
+            sessionStorage.removeItem('satyamai_pending_paypal');
+          } catch {
+            // ignore
+          }
+          setPurchaseError((err as Error)?.message || 'Payment confirmation failed. Please try again.');
+        })
+        .finally(() => {
+          setIsVerifyingPayment(false);
+        });
+    }
+  }, [fetchTransactions]);
+
   const handlePurchasePackage = async (packageId: string) => {
     setIsPurchasing(packageId);
     setPurchaseError(null);
     setPurchaseSuccess(null);
 
     try {
-      // 1. Create order
+      const returnUrl = `${window.location.origin}/analyze?paypal_return=true&package_id=${packageId}`;
+      const cancelUrl = `${window.location.origin}/analyze?paypal_cancel=true&package_id=${packageId}`;
+
+      // 1. Create order on server
       const createRes = await fetch('/api/v1/payments/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ packageId }),
+        body: JSON.stringify({ packageId, returnUrl, cancelUrl }),
       });
       const orderData = await createRes.json();
       if (!createRes.ok) {
         throw new Error(orderData?.error?.message || 'Payment initiation failed.');
       }
 
-      // 2. Capture order
-      const captureRes = await fetch('/api/v1/payments/capture-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: orderData.orderId,
-          packageId,
-        }),
-      });
-      const captureData = await captureRes.json();
-      if (!captureRes.ok) {
-        throw new Error(captureData?.error?.message || 'Payment confirmation failed.');
+      const approvalUrl =
+        orderData.approveUrl ||
+        orderData.approvalUrl ||
+        orderData.links?.find((l: { rel: string; href: string }) => l.rel === 'approve')?.href;
+
+      if (!approvalUrl) {
+        throw new Error('PayPal approval link was not returned by the server.');
       }
 
-      setPurchaseSuccess(`Payment confirmed! +${captureData.creditsAdded} checks added to your account.`);
-      setCreditBalance(captureData.newBalance);
-      setCreditAvailable(captureData.newBalance);
-      setIsCreditsExhausted(false);
-      setErrorMessage(null);
-      await fetchTransactions();
+      // Save pending order details in sessionStorage
+      try {
+        sessionStorage.setItem(
+          'satyamai_pending_paypal',
+          JSON.stringify({
+            orderId: orderData.orderId,
+            packageId,
+            createdAt: Date.now(),
+          })
+        );
+      } catch {
+        // ignore
+      }
+
+      // 2. Redirect buyer to PayPal's approval URL
+      window.location.href = approvalUrl;
     } catch (err: unknown) {
-      setPurchaseError((err as Error)?.message || 'Payment could not be completed. Please try again.');
-    } finally {
+      setPurchaseError((err as Error)?.message || 'Payment could not be started. Please try again.');
       setIsPurchasing(null);
     }
   };
@@ -1453,6 +1563,7 @@ Helpline (India): 1930 | cybercrime.gov.in`;
         transactions={transactions}
         isLedgerLoading={isLedgerLoading}
         onRefreshLedger={fetchTransactions}
+        isVerifyingPayment={isVerifyingPayment}
       />
     </div>
   );

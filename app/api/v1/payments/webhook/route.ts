@@ -60,6 +60,16 @@ export async function POST(req: NextRequest) {
     switch (eventType) {
       case 'PAYMENT.CAPTURE.COMPLETED': {
         const capture = event.resource;
+        const captureStatus = capture.status || 'COMPLETED';
+
+        // Never grant credits for an unapproved, pending, or failed payment
+        if (captureStatus !== 'COMPLETED') {
+          safeLogger.warn(
+            `Ignoring webhook capture with non-completed status: ${captureStatus} for event ${event.id}`
+          );
+          break;
+        }
+
         const captureId = capture.id;
         const orderId =
           capture.supplementary_data?.related_ids?.order_id || capture.invoice_id || captureId;
@@ -70,6 +80,20 @@ export async function POST(req: NextRequest) {
           const pkg = getCreditPackageById(packageId);
 
           if (pkg && userId) {
+            // Verify captured amount and currency
+            if (capture.amount?.value && parseFloat(capture.amount.value) < parseFloat(pkg.price)) {
+              safeLogger.error(
+                `Amount mismatch in webhook: expected ${pkg.price}, got ${capture.amount.value}`
+              );
+              break;
+            }
+            if (capture.amount?.currency_code && capture.amount.currency_code !== pkg.currency) {
+              safeLogger.error(
+                `Currency mismatch in webhook: expected ${pkg.currency}, got ${capture.amount.currency_code}`
+              );
+              break;
+            }
+
             const price = capture.amount?.value || pkg.price;
             const currency = capture.amount?.currency_code || pkg.currency;
 
@@ -116,8 +140,9 @@ export async function POST(req: NextRequest) {
       }
 
       case 'PAYMENT.CAPTURE.DENIED':
-      case 'PAYMENT.CAPTURE.DECLINED': {
-        safeLogger.warn(`Payment capture was denied by PayPal: ${event.id}`);
+      case 'PAYMENT.CAPTURE.DECLINED':
+      case 'PAYMENT.CAPTURE.PENDING': {
+        safeLogger.warn(`Payment capture event was not completed by PayPal: ${eventType} (${event.id})`);
         break;
       }
 

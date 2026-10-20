@@ -29,6 +29,7 @@ interface CreditModalsProps {
   transactions: CreditTransaction[];
   isLedgerLoading: boolean;
   onRefreshLedger: () => void;
+  isVerifyingPayment?: boolean;
 }
 
 export function CreditModals({
@@ -46,6 +47,7 @@ export function CreditModals({
   transactions,
   isLedgerLoading,
   onRefreshLedger,
+  isVerifyingPayment,
 }: CreditModalsProps) {
   if (!isTopUpOpen && !isLedgerOpen) return null;
 
@@ -87,6 +89,13 @@ export function CreditModals({
             </div>
 
             {/* Feedback Messages */}
+            {isVerifyingPayment && (
+              <div className="mb-6 p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs flex items-center gap-3">
+                <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0" />
+                <div className="font-medium">Confirming your PayPal payment and adding checks to your account...</div>
+              </div>
+            )}
+
             {purchaseSuccess && (
               <div className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-3">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
@@ -134,7 +143,7 @@ export function CreditModals({
 
                     <button
                       type="button"
-                      disabled={Boolean(isPurchasing)}
+                      disabled={Boolean(isPurchasing) || Boolean(isVerifyingPayment)}
                       onClick={() => onPurchase(pkg.id)}
                       className={`mt-5 w-full py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition disabled:opacity-50 ${
                         pkg.popular
@@ -145,7 +154,7 @@ export function CreditModals({
                       {isSelected ? (
                         <>
                           <div className="w-3.5 h-3.5 border-2 border-slate-400 border-t-slate-800 rounded-full animate-spin" />
-                          <span>Processing...</span>
+                          <span>Redirecting to PayPal...</span>
                         </>
                       ) : (
                         <>

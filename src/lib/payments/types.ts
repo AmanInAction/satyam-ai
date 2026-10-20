@@ -74,6 +74,26 @@ export interface PayPalOAuthTokenResponse {
 export interface PayPalOrderResponse {
   id: string;
   status: 'CREATED' | 'SAVED' | 'APPROVED' | 'VOIDED' | 'COMPLETED' | 'PAYER_ACTION_REQUIRED';
+  approvalUrl?: string | null;
+  approveUrl?: string | null;
+  links?: Array<{
+    href: string;
+    rel: string;
+    method: string;
+  }>;
+}
+
+export interface PayPalOrderDetails {
+  id: string;
+  status: 'CREATED' | 'SAVED' | 'APPROVED' | 'VOIDED' | 'COMPLETED' | 'PAYER_ACTION_REQUIRED';
+  intent?: string;
+  purchase_units?: Array<{
+    reference_id?: string;
+    amount?: {
+      currency_code: string;
+      value: string;
+    };
+  }>;
   links?: Array<{
     href: string;
     rel: string;
