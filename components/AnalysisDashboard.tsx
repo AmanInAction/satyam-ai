@@ -34,6 +34,8 @@ import {
 } from '../src/lib/validation/schemas';
 import { CreditBar, EssentialSafetyGuidanceCard } from './CreditBar';
 import { CreditModals } from './CreditModals';
+import { AuthModal, UserProfile } from './AuthModal';
+import { HistoryModal } from './HistoryModal';
 import { CreditPackage, CreditTransaction } from '@/src/lib/payments/types';
 
 interface PresetScenario {
@@ -282,9 +284,51 @@ export default function AnalysisDashboard() {
     }
   }, []);
 
+  const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+
+  const checkAuth = useCallback(async () => {
+    try {
+      const res = await fetch('/api/v1/auth/me');
+      if (res.ok) {
+        const data = await res.json();
+        setIsAuthenticated(Boolean(data.isAuthenticated));
+        if (data.user) {
+          setCurrentUser(data.user);
+        } else {
+          setCurrentUser(null);
+        }
+        if (typeof data.balance === 'number') setCreditBalance(data.balance);
+        if (typeof data.available === 'number') setCreditAvailable(data.available);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const handleSelectAnalysisFromHistory = async (analysisId: string) => {
+    try {
+      const res = await fetch(`/api/v1/history?id=${encodeURIComponent(analysisId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.analysis?.full_result) {
+          setResult(data.analysis.full_result);
+          setIsHistoryOpen(false);
+          // Scroll to result view
+          window.scrollTo({ top: 400, behavior: 'smooth' });
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   useEffect(() => {
     fetchCredits();
-  }, [fetchCredits]);
+    checkAuth();
+  }, [fetchCredits, checkAuth]);
 
   // Handle return from PayPal approval or cancellation
   useEffect(() => {
@@ -850,6 +894,10 @@ Helpline (India): 1930 | cybercrime.gov.in`;
           fetchTransactions();
           setIsLedgerOpen(true);
         }}
+        onOpenHistory={() => setIsHistoryOpen(true)}
+        onOpenAuth={() => setIsAuthOpen(true)}
+        isAuthenticated={isAuthenticated}
+        user={currentUser}
       />
 
       {/* Safety guidance card if checks are exhausted */}
@@ -1564,6 +1612,35 @@ Helpline (India): 1930 | cybercrime.gov.in`;
         isLedgerLoading={isLedgerLoading}
         onRefreshLedger={fetchTransactions}
         isVerifyingPayment={isVerifyingPayment}
+      />
+
+      {/* Persistent SQLite Authentication Modal */}
+      <AuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+        isAuthenticated={isAuthenticated}
+        user={currentUser}
+        balance={creditBalance}
+        available={creditAvailable}
+        onAuthSuccess={(userData, newBalance, newAvailable) => {
+          setIsAuthenticated(true);
+          setCurrentUser(userData);
+          setCreditBalance(newBalance);
+          setCreditAvailable(newAvailable);
+          fetchTransactions();
+        }}
+        onLogoutSuccess={() => {
+          setIsAuthenticated(false);
+          setCurrentUser(null);
+          fetchCredits();
+        }}
+      />
+
+      {/* Persistent SQLite Verification History Modal */}
+      <HistoryModal
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        onSelectAnalysis={handleSelectAnalysisFromHistory}
       />
     </div>
   );

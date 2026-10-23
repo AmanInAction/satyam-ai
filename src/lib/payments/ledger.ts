@@ -8,6 +8,7 @@ import {
 } from './types';
 import { FREE_INITIAL_CREDITS } from './config';
 import { safeLogger } from '../security/logger';
+import { defaultDb } from '../db/database';
 
 export class CreditLedgerService {
   private transactions: Map<string, CreditTransaction[]> = new Map(); // userId -> transactions
@@ -74,11 +75,28 @@ export class CreditLedgerService {
    * Appends a transaction to the on-disk journal atomically.
    */
   private appendToJournal(tx: CreditTransaction) {
-    if (!this.journalPath) return;
+    if (this.journalPath) {
+      try {
+        fs.appendFileSync(this.journalPath, JSON.stringify(tx) + '\n', 'utf8');
+      } catch (err: unknown) {
+        safeLogger.error(`Failed to write transaction to journal: ${(err as Error)?.message}`);
+      }
+    }
+    // Also record synchronously into SQLite for ACID persistence
     try {
-      fs.appendFileSync(this.journalPath, JSON.stringify(tx) + '\n', 'utf8');
-    } catch (err: unknown) {
-      safeLogger.error(`Failed to write transaction to journal: ${(err as Error)?.message}`);
+      defaultDb.recordTransaction({
+        id: tx.id,
+        userId: tx.userId,
+        type: tx.type,
+        amount: tx.amount,
+        balanceAfter: tx.balanceAfter,
+        reason: tx.reason,
+        idempotencyKey: tx.idempotencyKey,
+        metadata: tx.metadata,
+        createdAt: tx.timestamp,
+      });
+    } catch (dbErr: unknown) {
+      safeLogger.warn(`SQLite transaction sync notice: ${(dbErr as Error)?.message}`);
     }
   }
 
@@ -425,6 +443,55 @@ export class CreditLedgerService {
   async getTransactions(userId: string): Promise<CreditTransaction[]> {
     return this.withUserLock(userId, async () => {
       return [...(this.transactions.get(userId) || [])].reverse();
+    });
+  }
+
+  /**
+   * Migrates credits and transaction history from an anonymous user to an authenticated account.
+   */
+  async migrateUser(fromUserId: string, toUserId: string): Promise<CreditBalanceResponse> {
+    if (!fromUserId || !toUserId || fromUserId === toUserId) {
+      return this.getBalance(toUserId);
+    }
+
+    return this.withUserLock(toUserId, async () => {
+      return this.withUserLock(fromUserId, async () => {
+        const fromBalance = this.balances.get(fromUserId) || 0;
+        const toBalance = this.balances.get(toUserId) || 0;
+
+        if (fromBalance > 0) {
+          const newBalance = toBalance + fromBalance;
+          this.balances.set(toUserId, newBalance);
+          this.balances.set(fromUserId, 0);
+
+          const tx: CreditTransaction = {
+            id: `tx_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+            userId: toUserId,
+            timestamp: new Date().toISOString(),
+            type: 'initial_grant',
+            amount: fromBalance,
+            balanceAfter: newBalance,
+            reason: `Account link: merged ${fromBalance} credits from anonymous session`,
+            idempotencyKey: `merge_${fromUserId}_to_${toUserId}`,
+            metadata: { mergedFrom: fromUserId },
+          };
+          this.applyTransactionToMemory(tx);
+          this.appendToJournal(tx);
+        }
+
+        const fromTxs = this.transactions.get(fromUserId) || [];
+        const toTxs = this.transactions.get(toUserId) || [];
+        this.transactions.set(toUserId, [...toTxs, ...fromTxs]);
+        this.transactions.delete(fromUserId);
+
+        try {
+          defaultDb.migrateAnonymousData(fromUserId, toUserId);
+        } catch {
+          // ignore
+        }
+
+        return this.computeBalanceResponse(toUserId);
+      });
     });
   }
 

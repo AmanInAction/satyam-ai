@@ -29,6 +29,7 @@ export interface CreditTransaction {
     currency?: string;
     price?: string;
     refundId?: string;
+    [key: string]: unknown;
   };
 }
 

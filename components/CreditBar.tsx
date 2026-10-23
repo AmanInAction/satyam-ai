@@ -10,6 +10,9 @@ import {
   AlertTriangle,
   ArrowRight,
   ExternalLink,
+  History,
+  User as UserIcon,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface CreditBarProps {
@@ -18,6 +21,10 @@ interface CreditBarProps {
   isLoading: boolean;
   onOpenTopUp: () => void;
   onOpenLedger: () => void;
+  onOpenHistory?: () => void;
+  onOpenAuth?: () => void;
+  isAuthenticated?: boolean;
+  user?: { email?: string; displayName?: string } | null;
 }
 
 export function CreditBar({
@@ -26,6 +33,10 @@ export function CreditBar({
   isLoading,
   onOpenTopUp,
   onOpenLedger,
+  onOpenHistory,
+  onOpenAuth,
+  isAuthenticated,
+  user,
 }: CreditBarProps) {
   const isExhausted = available <= 0;
 
@@ -44,7 +55,7 @@ export function CreditBar({
         </div>
 
         <div>
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 text-xs flex-wrap">
             <span className="text-slate-600 font-medium">Checks available:</span>
             <span
               className={`text-sm font-bold ${
@@ -58,6 +69,12 @@ export function CreditBar({
                 ({balance - available} pending)
               </span>
             )}
+            {isAuthenticated && user && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                <ShieldCheck className="w-3 h-3" />
+                {user.displayName || user.email?.split('@')[0]}
+              </span>
+            )}
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
             {isExhausted
@@ -68,15 +85,37 @@ export function CreditBar({
       </div>
 
       {/* Right side: Action Buttons */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        {onOpenHistory && (
+          <button
+            type="button"
+            onClick={onOpenHistory}
+            className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-medium flex items-center gap-1.5 transition focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 outline-none"
+          >
+            <History className="w-3.5 h-3.5 text-slate-500" />
+            <span>Scan history</span>
+          </button>
+        )}
+
         <button
           type="button"
           onClick={onOpenLedger}
           className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-medium flex items-center gap-1.5 transition focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 outline-none"
         >
           <Receipt className="w-3.5 h-3.5 text-slate-500" />
-          <span>Check history</span>
+          <span>Receipts</span>
         </button>
+
+        {onOpenAuth && (
+          <button
+            type="button"
+            onClick={onOpenAuth}
+            className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-medium flex items-center gap-1.5 transition focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 outline-none"
+          >
+            <UserIcon className="w-3.5 h-3.5 text-slate-500" />
+            <span>{isAuthenticated ? 'Account' : 'Sign in'}</span>
+          </button>
+        )}
 
         <button
           type="button"

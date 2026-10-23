@@ -5,6 +5,7 @@ import { defaultOrchestrator } from '@/src/lib/analysis/orchestrator';
 import { defaultRateLimiter } from '@/src/lib/security/rateLimiter';
 import { checkAndReserveCredits, finalizeCreditUsage, CreditGuardResult } from '@/src/lib/payments/creditGuard';
 import { attachUserSessionHeaders } from '@/src/lib/payments/userSession';
+import { defaultDb } from '@/src/lib/db/database';
 
 export async function OPTIONS() {
   return new NextResponse(null, {
@@ -86,6 +87,26 @@ export async function POST(req: NextRequest) {
       analysis.analysis_id,
       true
     );
+
+    // Save to SQLite database for persistent user history
+    try {
+      defaultDb.saveAnalysis({
+        id: analysis.analysis_id,
+        userId: creditGuardResult.sessionInfo.userId,
+        inputType: 'url',
+        inputPreview: parseResult.data.url.slice(0, 280),
+        verdict: analysis.classification.scam_risk.verdict,
+        scamRisk: analysis.classification.scam_risk.risk_level,
+        claimVerdict: analysis.classification.claim_verification.verdict,
+        confidenceScore: 0.95,
+        reasonsSummary:
+          analysis.reasons?.map((r) => r.title || r.explanation).slice(0, 2).join('; ') ||
+          'URL reputation and threat analysis completed',
+        fullResult: analysis,
+      });
+    } catch {
+      // Non-blocking best-effort history save
+    }
 
     const response = NextResponse.json({
       ...analysis,
