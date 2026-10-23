@@ -146,20 +146,20 @@ export async function POST(req: NextRequest) {
         `PayPal API error during capture: status=${err.statusCode}, issue=${err.issueCode}, message=${err.message}`
       );
 
-      if (err.issueCode === 'ORDER_NOT_APPROVED' || err.statusCode === 422) {
-        return createErrorResponse(
-          422,
-          'ORDER_NOT_APPROVED',
-          'Order has not been approved by the buyer. Please complete approval at PayPal before capturing.',
-          requestId
-        );
-      }
-
       if (err.issueCode === 'ORDER_CANCELLED') {
         return createErrorResponse(
           422,
           'ORDER_CANCELLED',
           'Order was cancelled by the buyer.',
+          requestId
+        );
+      }
+
+      if (err.issueCode === 'ORDER_NOT_APPROVED' || err.statusCode === 422) {
+        return createErrorResponse(
+          422,
+          'ORDER_NOT_APPROVED',
+          'Order has not been approved by the buyer. Please complete approval at PayPal before capturing.',
           requestId
         );
       }

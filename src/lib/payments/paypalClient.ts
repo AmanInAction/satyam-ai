@@ -171,7 +171,16 @@ export class PayPalClient {
     if (!this.isConfigured() || orderId.startsWith('SIM_ORDER_') || orderId === '8BV01433166897441') {
       const sim = getSimulatedOrdersStore().get(orderId);
       const pkg = sim ? getCreditPackageById(sim.packageId) : getCreditPackageById('plus');
-      const status = sim ? sim.status : (orderId === '8BV01433166897441' ? 'CREATED' : 'APPROVED');
+      let status: 'CREATED' | 'SAVED' | 'APPROVED' | 'VOIDED' | 'COMPLETED' | 'PAYER_ACTION_REQUIRED';
+      if (sim?.status === 'CANCELLED') {
+        status = 'VOIDED';
+      } else if (sim) {
+        status = sim.status;
+      } else if (orderId === '8BV01433166897441') {
+        status = 'CREATED';
+      } else {
+        status = 'APPROVED';
+      }
 
       return {
         id: orderId,
@@ -325,7 +334,7 @@ export class PayPalClient {
    * Captures an approved PayPal order and validates payment completion.
    */
   async captureOrder(orderId: string, packageId?: string): Promise<PayPalCaptureResponse> {
-    const sim = PayPalClient.simulatedOrders.get(orderId);
+    const sim = getSimulatedOrdersStore().get(orderId);
 
     if (sim && sim.status === 'CANCELLED') {
       safeLogger.warn(`PayPal capture rejected for cancelled order: ${orderId}`);
