@@ -1,105 +1,300 @@
 # SatyamAI — Scam & Misinformation Checker
 
-SatyamAI helps people assess suspicious messages, URLs, screenshots (when enabled), and viral claims. It combines deterministic signals, reputation checks, source retrieval, and AI-assisted interpretation to explain potential risk, evidence, uncertainty, and next steps.
+[![Next.js 15](https://img.shields.io/badge/Next.js-15%2B-black?style=flat&logo=next.js)](https://nextjs.org/)
+[![TypeScript 5.7](https://img.shields.io/badge/TypeScript-5.7-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
+[![Tailwind CSS v4](https://img.shields.io/badge/Tailwind-v4-38bdf8?style=flat&logo=tailwindcss)](https://tailwindcss.com/)
+[![SQLite](https://img.shields.io/badge/SQLite-Node_22_Native-003B57?style=flat&logo=sqlite)](https://nodejs.org/api/sqlite.html)
+[![Vitest](https://img.shields.io/badge/Tests-218_Passed-success?style=flat&logo=vitest)](https://vitest.dev/)
+[![National Cyber Helpline](https://img.shields.io/badge/Helpline-1930-red?style=flat)](https://cybercrime.gov.in)
 
-## Important product boundary
+> **SatyamAI** (सत्यम् AI) is a production-grade, India-aware decision-support platform designed to protect citizens from deceptive messages, phishing links, viral claims, and extortion traps. It uniquely separates **Scam/Fraud Risk** from **Factual Claim Verification**, backed by deterministic heuristic rules, live source citations, and contextual AI reasoning.
 
-SatyamAI is an advisory decision-support tool. It does not guarantee that a message or website is safe, prove that a payment settled, authenticate every screenshot/document, or determine factual truth without evidence. “No evidence found” is not “safe.”
+---
 
-## Read the docs in this order
+## 🏛️ Comprehensive Mermaid Architecture
 
-1. [`SOURCE_OF_TRUTH.md`](./SOURCE_OF_TRUTH.md) — canonical product specifications, competitive differentiation, safety, and agent workflow.
-2. [`DEVELOPMENT_ROADMAP.md`](./DEVELOPMENT_ROADMAP.md) — phased roadmap, verified release gates, and agent execution playbook.
-3. [`docs/API_CONTRACT.md`](./docs/API_CONTRACT.md) — authoritative endpoint and response schemas (Zod).
-4. [`docs/TEST_PLAN.md`](./docs/TEST_PLAN.md) — test strategy, evaluation fixtures, release gates, and feature traceability matrix (F1–F14).
-5. [`docs/DECISIONS.md`](./docs/DECISIONS.md) — Architecture and Product Decision Records (ADRs D-001 through D-012).
-6. [`docs/REPOSITORY_AUDIT.md`](./docs/REPOSITORY_AUDIT.md) — detailed repository audit, requirement-to-code traceability, and verification evidence.
+### 1. High-Level System Architecture & Component Topology
 
-## Architecture baseline
+```mermaid
+graph TD
+    subgraph ClientLayer ["Client Layer (Web & Messaging)"]
+        UI["Next.js 15 Web Dashboard<br/>(/analyze & /)"]
+        TGBot["Telegram Bot User<br/>(@SatyamAIBot)"]
+        PaypalModal["Payment Sandbox UI<br/>(PayPal / Razorpay)"]
+    end
 
-- Full-stack Next.js App Router and TypeScript.
-- Route Handlers under `/api/v1`.
-- Zod validation.
-- Modular analysis orchestrator and server-only provider adapters.
-- Amazon Bedrock as the chosen LLM platform, behind a replaceable adapter.
-- Vitest for automated tests.
+    subgraph GatewayLayer ["Edge & Security Middleware"]
+        RateLimit["In-Memory Rate Limiter<br/>(IP & User Bounded)"]
+        SSRF["SSRF Defense Guard<br/>(Blocks 127.0.0.1, 169.254.169.254)"]
+        SessionParser["Session Resolver<br/>(Cookie / Bearer Token)"]
+    end
 
-Do not reintroduce Express, Vite, or a separate FastAPI service without an explicitly approved decision record. The current repository—not a generic template—determines exact scripts and paths.
+    subgraph CoreEngine ["Analysis & Verification Engine"]
+        CreditGuard["Two-Phase Credit Guard<br/>(res_xxx with 2-min TTL)"]
+        RulesEngine["Deterministic Rules Engine (&lt;2ms)<br/>- UPI PIN / QR Reversals<br/>- Electricity Disconnection Threats<br/>- 'Digital Arrest' Extortion<br/>- KYC / Bank Block Scare Tactics<br/>- Hindi & Hinglish Linguistic Cues"]
+        Orchestrator["Analysis Orchestrator<br/>(Signal Fusion & Multi-Verdict Logic)"]
+    end
 
-## Integrations
+    subgraph ExternalAdapters ["External Provider Adapters"]
+        Bedrock["Amazon Bedrock Adapter<br/>(Claude 3 Haiku / Nova)"]
+        FactCheck["Google Fact Check Tools API<br/>(Attributable Citations)"]
+        SafeBrowsing["Safe Browsing / URL Reputation<br/>(Phishing Domain Telemetry)"]
+        VisionOCR["OCR & Vision Adapter<br/>(Screenshot Text Extraction)"]
+    end
 
-Potential provider categories:
-- AI: Amazon Bedrock.
-- Evidence: Google Fact Check Tools and/or a suitable web-search provider.
-- URL reputation: Google Safe Browsing, VirusTotal, or another evaluated provider.
-- OCR/vision: Bedrock vision model or a suitable OCR implementation.
+    subgraph DataPersistence ["Persistence & Storage Layer (ACID)"]
+        SQLiteDB["Node 22 Native SQLite (WAL Mode)<br/>- users (salted scrypt)<br/>- sessions (token auth)<br/>- analyses (scan history)<br/>- transactions (audit ledger)"]
+        JSONLJournal["Durable Append-Only Journal<br/>(.data/credit_ledger.jsonl)"]
+    end
 
-Before connecting a provider, verify current official API docs, model availability in the intended AWS region, pricing, quotas, privacy terms, required secrets, and fallback behavior. Never expose credentials in browser code. Keep mocks visibly separate from real results.
+    UI --> SessionParser
+    UI --> PaypalModal
+    TGBot --> SessionParser
+    SessionParser --> RateLimit
+    RateLimit --> SSRF
+    SSRF --> CreditGuard
+    CreditGuard --> Orchestrator
+    Orchestrator --> RulesEngine
+    Orchestrator --> Bedrock
+    Orchestrator --> FactCheck
+    Orchestrator --> SafeBrowsing
+    Orchestrator --> VisionOCR
+    Orchestrator --> SQLiteDB
+    CreditGuard --> SQLiteDB
+    CreditGuard --> JSONLJournal
+    PaypalModal --> SQLiteDB
+```
 
-## Local development
+---
 
-Use the scripts that actually exist in `package.json`. At minimum, the coding agent must verify and document:
-- dependency installation (`npm install`);
-- development server startup (`npm run dev`);
-- lint/type-check command (`npm run lint`);
-- test command (`npm test`);
-- production build (`npm run build`);
-- required environment variables (`.env.example`).
+### 2. End-to-End Analysis & Verification Sequence
 
-Do not guess commands or mark them verified without running them.
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User / Judge
+    participant UI as Web Dashboard
+    participant API as /api/v1/analyze/*
+    participant Guard as Credit Guard
+    participant Rules as Deterministic Rules
+    participant LLM as Amazon Bedrock / Gemini
+    participant Evidence as Fact Check Tools
+    participant DB as SQLite DB & Journal
 
-## Telegram Bot Integration
+    User->>UI: Submits message, URL, or screenshot
+    UI->>API: POST /api/v1/analyze/text (with Cookie/Header)
+    API->>Guard: checkAndReserveCredits(req, cost=1)
+    alt Available Credits < Cost
+        Guard-->>API: Throw INSUFFICIENT_CREDITS
+        API-->>UI: HTTP 402 with purchase options
+    else Credits Available
+        Guard->>Guard: Issue reservation (res_xxx, TTL=120s)
+        Guard-->>API: Reservation confirmed
+    end
 
-SatyamAI includes a production-grade Telegram Bot Webhook endpoint reusing the central analysis pipeline:
+    API->>Rules: Evaluate deterministic patterns (<2ms)
+    opt Pattern Detected (e.g. Electricity Scam or UPI Trap)
+        Rules-->>API: High-confidence scam verdict + reasons
+    end
 
-- **Webhook URL:** `https://<YOUR_DEPLOYED_DOMAIN>/api/v1/telegram/webhook`
-- **Diagnostics Check:** `GET /api/v1/telegram/webhook`
-- **Environment Variables:**
-  - `TELEGRAM_BOT_TOKEN`: The API token provided by `@BotFather` (server-side only).
-  - `TELEGRAM_WEBHOOK_SECRET`: Secret token for validating `X-Telegram-Bot-Api-Secret-Token` header.
-- **Webhook Registration Command:**
-  ```bash
-  curl -F "url=https://<YOUR_DOMAIN>/api/v1/telegram/webhook" \
-       -F "secret_token=<YOUR_TELEGRAM_WEBHOOK_SECRET>" \
-       https://api.telegram.org/bot<YOUR_TELEGRAM_BOT_TOKEN>/setWebhook
-  ```
-- **Features Supported:**
-  - Commands: `/start`, `/help` (Bilingual English + Hindi with National Cyber Crime Helpline 1930).
-  - Text & Forwarded Messages: Full scam risk & factual accuracy analysis.
-  - Links: Phishing and domain spoofing assessment.
-  - Deduplication: In-memory `update_id` cache prevents duplicate processing on network retries.
-  - Per-Chat Rate Limiting: 30 requests/minute.
-  - Zero raw message persistence.
+    API->>Evidence: Query fact-checks / domain reputation
+    Evidence-->>API: Source title, publisher, URL, rating
 
-## PayPal Sandbox & Credit Monetization Engine
+    API->>LLM: Synthesize contextual reasoning (Bedrock / Gemini)
+    LLM-->>API: Structured explanation + recommended actions
 
-SatyamAI implements an idempotent credit-based freemium architecture and official PayPal Sandbox integration:
+    API->>Guard: finalizeCreditUsage(reservation, analysisId, success=true)
+    Guard->>DB: Commit debit transaction (-1 check)
+    API->>DB: saveAnalysis(id, user_id, verdict, preview, fullResult)
+    API-->>UI: HTTP 200 { scam_risk, claim_verification, reasons, evidence, credits }
+    UI-->>User: Renders Dual Verdict, Safety Checklist & Helpline (1930)
+```
 
-- **Freemium Initial Grant:**
-  - Every eligible new user automatically receives **3 free verification credits**, granted exactly once.
-  - Idempotent: Repeated sign-ins, page reloads, and webhook retries never grant additional free credits.
-- **Verification Credit Costs:**
-  - Text message or viral claim check: **1 credit**.
-  - Website link or URL inspection: **1 credit**.
-  - Screenshot image OCR verification: **2 credits**.
-- **PayPal Sandbox Purchase Packages:**
-  - **Starter Package:** 10 Credits for $2.00 USD.
-  - **Plus Package (Popular):** 30 Credits for $5.00 USD.
-  - **Pro Security Package:** 100 Credits for $12.00 USD.
-- **Durable Credit Ledger:**
-  - Durable append-only journal (`.data/credit_ledger.jsonl`) recording chronological balance changes, references, and reasons.
-  - Two-Phase Reservation & Commit: Credits are reserved prior to analysis execution and committed only upon success. On pipeline or provider failure, reserved credits are immediately restored.
-  - Concurrent Mutex Locks: Prevents race conditions or double-spending.
-  - PayPal Webhook Idempotency: Duplicate payment callbacks or webhooks cannot grant credits twice.
-- **Active Scam Defense Guarantee:**
-  - When credits are exhausted, SatyamAI's **Essential Scam Safety Guidance Card** activates, ensuring Indian users never lose access to critical cybercrime prevention guidance (National Cyber Crime Helpline 1930, never share OTP/UPI PIN, and no digital arrest).
-- **Environment Configuration:**
-  - `PAYPAL_CLIENT_ID`: PayPal Developer Sandbox App Client ID.
-  - `PAYPAL_CLIENT_SECRET`: PayPal Developer Sandbox Secret.
-  - `PAYPAL_WEBHOOK_ID`: PayPal Webhook ID for signature verification.
-  - `PAYPAL_ENV`: Defaults to `sandbox` (`api-m.sandbox.paypal.com`).
-  - Simulation Mode: When credentials are unconfigured in test/dev environments, safe sandbox simulation enables end-to-end checkout, capture, and verification without failing.
+---
 
-## Agent rules
+### 3. SQLite Authentication & Anonymous Guest Data Migration
 
-Read the docs above, inspect current code, map requirements to implemented/partial/missing/blocked/deferred, then work on the highest-priority missing requirement. Update docs when schemas or decisions change. Report actual test outcomes and limitations honestly.
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Guest as Anonymous Guest
+    participant Frontend as Browser
+    participant AuthAPI as /api/v1/auth/register
+    participant Ledger as Credit Ledger
+    participant DB as SQLite Database
+
+    Guest->>Frontend: Visited site as guest (satyam_user_id = usr_anon_123)
+    Note over Guest,Frontend: Granted 3 free checks, performed 1 scan
+    Guest->>Frontend: Clicks "Sign in" -> "Create Account"
+    Frontend->>AuthAPI: POST { email, password, displayName } + x-user-id header
+    AuthAPI->>DB: createUser(email, scrypt_hash, salt)
+    AuthAPI->>Ledger: migrateUser(from: usr_anon_123, to: usr_auth_456)
+    Ledger->>DB: UPDATE transactions SET user_id = usr_auth_456 WHERE user_id = usr_anon_123
+    Ledger->>DB: UPDATE analyses SET user_id = usr_auth_456 WHERE user_id = usr_anon_123
+    Ledger->>Ledger: Consolidate remaining check balances
+    AuthAPI->>DB: createSession(usr_auth_456)
+    AuthAPI-->>Frontend: HTTP 200 { success: true, token, balance } + Set-Cookie (satyam_session_token)
+    Frontend-->>Guest: Shows "Active & Synced" with all credits & history preserved!
+```
+
+---
+
+### 4. Payment Gateway Sandbox & Credit Monetization Engine
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User
+    participant UI as Credit Bar / Top-Up Modal
+    participant PayAPI as /api/v1/payments/*
+    participant Gateway as PayPal Sandbox / Razorpay
+    participant Ledger as Durable Credit Ledger
+    participant DB as SQLite DB
+
+    User->>UI: Selects Package (e.g. Value Pack: 25 checks / $5.00)
+    UI->>PayAPI: POST /api/v1/payments/create-order { packageId: "pack_25" }
+    PayAPI->>Gateway: Create order with validated currency & price
+    Gateway-->>PayAPI: Order ID (ORD-12345) + approvalUrl
+    PayAPI-->>UI: Order details
+
+    User->>Gateway: Approves payment in Sandbox window
+    Gateway-->>UI: Redirect back with token & PayerID
+    UI->>PayAPI: POST /api/v1/payments/capture-order { orderId: "ORD-12345" }
+    PayAPI->>Gateway: Capture authorized order
+    Gateway-->>PayAPI: Status: COMPLETED, Amount: $5.00 USD
+    PayAPI->>Ledger: addPurchaseCredits(userId, credits=25, orderId, captureId)
+    Note over Ledger: Idempotency check: rejects if orderId already credited
+    Ledger->>DB: Record purchase_credit transaction
+    Ledger->>Ledger: Update running balance (+25)
+    PayAPI-->>UI: HTTP 200 { balance: 27, transactionId: "tx_..." }
+    UI-->>User: Balance updated instantly, receipt logged to ledger
+```
+
+---
+
+## 🌟 Core Features & Differentiation
+
+### 1. Dual-Dimension Risk Separation
+Traditional AI chatbots collapse complex information into a single generic label ("looks safe" or "suspicious"). SatyamAI separates evaluations into **two distinct dimensions**:
+* **Dimension 1: Scam & Financial Fraud Threat** (Phishing, credential harvesting, malware APKs, extortion).
+* **Dimension 2: Factual Claim Accuracy** (False quotes, fabricated policies, debunked viral claims).
+> *Why this matters:* A deceptive phishing lure can quote a 100% factual news event to sound convincing. Collapsing the dimensions leads to dangerous false positives or false negatives.
+
+### 2. India-Centric Fraud Intelligence
+* **UPI PIN Reversal Traps:** Detects scam offers requesting a UPI PIN to "receive" cashbacks or lottery winnings.
+* **Fake Electricity Cutoff SMS:** Catches urgent threats warning that power will be disconnected tonight at 9:30 PM.
+* **Fake "Digital Arrest":** Debunks Skype/WhatsApp law enforcement extortion by directly quoting Indian criminal procedure.
+* **Multilingual:** Handles English, Hindi (Devanagari), and Hinglish (colloquial Roman script).
+* **Helpline Routing:** Directly displays the **National Cyber Crime Helpline: 1930** and **cybercrime.gov.in**.
+
+### 3. Native Zero-Dependency SQLite Engine
+* Uses Node 22 native `node:sqlite` (`DatabaseSync`) in **WAL mode**.
+* Zero external native compilation dependencies (no `node-gyp` or C++ build tools required).
+* Persistent storage for:
+  - Users with salted `scrypt` password hashing.
+  - Session tokens with 30-day expiry.
+  - Saved scan history with search and privacy deletion.
+  - Financial transaction audit ledger.
+
+### 4. Two-Phase Credit Guard & Monetization
+* **3 Free Checks** for every guest on first visit.
+* **Two-Phase Reservation:** Checks are reserved prior to analysis and debited only on success.
+* **Fail-Safe Restoration:** If an analysis or provider aborts, credits are immediately returned.
+* **PayPal Sandbox Integration:** Secure server-authoritative checkout with anti-tampering guards and cryptographic idempotency.
+
+---
+
+## 🛠️ Technology Stack
+
+| Layer | Technology | Purpose |
+|---|---|---|
+| **Framework** | Next.js 15+ (App Router) | High-performance server components and API route handlers |
+| **Language** | TypeScript 5.7 | End-to-end type safety |
+| **Styling** | Tailwind CSS v4 | High-contrast light theme, accessible ARIA roles, responsive UI |
+| **Database** | Node 22 Native SQLite (`node:sqlite`) | ACID transactional storage in WAL mode |
+| **Validation** | Zod 3.24 | Strict runtime schema parsing on all requests and responses |
+| **AI Inference** | Amazon Bedrock & Gemini API Adapter | Server-side LLM inference with structured JSON output |
+| **Evidence Retrieval** | Google Fact Check Tools API | Attributable citations with publisher and canonical URL |
+| **Security** | SSRF & In-Memory Rate Limiter | Loopback / cloud metadata IP blocking and DDoS mitigation |
+| **Testing** | Vitest 4 | Unit, integration, security, and benchmark suites |
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+* Node.js `v22.13.0` or higher
+* npm `10.0+`
+
+### Installation
+```bash
+# Clone the repository
+git clone https://github.com/AmanInAction/satyam-ai.git
+cd satyam-ai
+
+# Install dependencies
+npm install
+```
+
+### Local Development
+```bash
+# Run the local development server (runs on port 3000)
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### Running Tests & Quality Checks
+```bash
+# Run all 218 automated Vitest tests across 19 suites
+npm run test
+
+# Run TypeScript type validation (0 errors)
+npm run lint
+
+# Build production bundle
+npm run build
+```
+
+---
+
+## 📡 API Endpoints Summary
+
+### Core Analysis
+* `POST /api/v1/analyze/text`: Evaluates suspicious messages or viral claims (Cost: 1 check).
+* `POST /api/v1/analyze/url`: Inspects links for phishing and brand spoofing (Cost: 1 check).
+* `POST /api/v1/analyze/image`: Extracts and analyzes screenshot text (Cost: 2 checks).
+* `GET /api/v1/health`: System health and provider availability diagnostics.
+
+### Authentication & User Accounts (SQLite)
+* `POST /api/v1/auth/register`: Creates an account, hashes password with salted scrypt, and migrates guest credits/scans.
+* `POST /api/v1/auth/login`: Verifies credentials and issues a secure session token.
+* `GET /api/v1/auth/me`: Retrieves current authenticated profile and check balance.
+* `POST /api/v1/auth/logout`: Invalidates active session token and clears cookies.
+
+### Scan History & Privacy Controls
+* `GET /api/v1/history`: Retrieves user's past scans with search, filtering, and pagination.
+* `DELETE /api/v1/history?id=...`: Deletes a specific scan or wipes all history (Privacy by Default).
+
+### Monetization & Payments Sandbox
+* `GET /api/v1/payments/credits`: Retrieves current check balance, allowance, and purchase packs.
+* `POST /api/v1/payments/create-order`: Generates a server-authoritative sandbox order.
+* `POST /api/v1/payments/capture-order`: Validates approval status, currency, and idempotently credits checks.
+* `GET /api/v1/payments/transactions`: Returns chronological audit trail of all grants, debits, and purchases.
+* `POST /api/v1/payments/webhook`: Handles asynchronous payment events.
+
+### Telegram Bot Webhook
+* `POST /api/v1/telegram/webhook`: Reuses the central analysis pipeline for text and links sent via Telegram.
+
+---
+
+## 🔒 Security & Privacy Guarantees
+
+1. **Privacy by Default:** Raw submissions are not permanently stored unless explicitly saved to your SQLite history, which you can wipe at any time.
+2. **SSRF Protection:** Server-side fetching strictly blocks `127.0.0.1`, `localhost`, private ranges (`10.0.0.0/8`, `192.168.0.0/16`), and cloud metadata services (`169.254.169.254`).
+3. **Adversarial Defenses:** User input containing prompt-injection tokens (`"Ignore all previous instructions"`) is treated as untrusted text and cannot override classification rules.
+4. **Idempotency:** Payment captures and webhook retries are guarded by database-backed unique indexes to eliminate duplicate crediting.
+
+---
+
+## 📄 License
+This project is licensed under the MIT License.

@@ -139,12 +139,13 @@ Traceability matrix mapping core differentiators to repository files, tests, and
 | **F10**| Real URL reputation provider | `src/lib/providers/reputationProvider.ts` (`CloudflareDnsReputationProvider` live DNS threat feed + `GoogleSafeBrowsingProvider`) | `tests/reputationProvider.test.ts` (5 tests) | **Implemented & Verified (Real Live Provider)** |
 | **F11**| Grounded claim extraction & verification | `src/lib/analysis/claimExtractor.ts`, `src/lib/analysis/evidenceEvaluator.ts` (detects analysis type, extracts propositions, scores relevance, enforces verdict discipline) | `tests/claimVerification.test.ts` (15 tests) | **Implemented & Verified** |
 | **F12**| Privacy by default | Zero persistent database storage; no raw body logging | Server config & routes | **Implemented & Verified** |
-| **F13**| False-pos / false-neg tracking | Evaluation dataset in test plan | `tests/*.test.ts` (196 automated tests passing across 17 suites) | **Verified (Phase 6, 7, 8 & 9)** |
+| **F13**| False-pos / false-neg tracking | Evaluation dataset in test plan | `tests/*.test.ts` (218 automated tests passing across 19 suites) | **Verified (Phase 6, 7, 8, 9 & 10)** |
 | **F14**| Screenshot / OCR | Multipart upload, vision adapter, image security, OCR review & refinement | `tests/imageSecurity.test.ts` (13 tests), `tests/visionProvider.test.ts` (7 tests), `tests/imageApiRoute.test.ts` (9 tests) | **Implemented & Verified** |
 | **F15**| Telegram bot | Webhook route, deduplication, rate limits, Markdown formatter | `tests/telegramWebhook.test.ts` (17 tests) | **Implemented & Verified (Phase 8)** |
-| **F16**| Feedback / history | Data-minimized feedback schema | — | **Deferred (Phase 8 - P2)** |
+| **F16**| Scan history & Privacy | User-controlled SQLite scan history with keyword search, pagination, single-scan delete, and clear all | `tests/sqliteAuthHistory.test.ts` | **Implemented & Verified (Phase 10)** |
 | **F17**| Rate Limiting & Security Headers | `src/lib/security/rateLimiter.ts`, `src/lib/security/logger.ts`, `next.config.mjs` | `tests/phase6SecurityPrivacy.test.ts` (9 tests) | **Implemented & Verified** |
-| **F18**| PayPal Sandbox & Credit Monetization | Credit ledger, freemium initial grant, order creation, capture verification, webhook idempotency, refund reversals | `tests/paymentsMonetization.test.ts` (14 tests) | **Implemented & Verified (Phase 9)** |
+| **F18**| PayPal Sandbox & Credit Monetization | Credit ledger, freemium initial grant, order creation, capture verification, webhook idempotency, refund reversals | `tests/paymentsMonetization.test.ts` (14 tests), `tests/paypalApprovalCapture.test.ts` (10 tests) | **Implemented & Verified (Phase 9)** |
+| **F19**| SQLite Native Auth & Migration | Node 22 native `node:sqlite` in WAL mode, salted scrypt password hashing, session tokens, and automatic guest-to-account migration | `src/lib/db/database.ts`, `src/lib/db/schema.ts`, `app/api/v1/auth/*`, `tests/sqliteAuthHistory.test.ts` (12 tests) | **Implemented & Verified (Phase 10)** |
 
 ## Test report format
 

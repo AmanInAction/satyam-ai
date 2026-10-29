@@ -253,3 +253,22 @@ Following explicit project owner approval, the application was transitioned from
    - `POST /api/v1/analyze/url`: **HTTP 200 OK**
    - UI Rendering: **Verified** on `http://localhost:3000/`
 
+---
+
+## 11. Addendum: Phase 9 (Monetization Engine) & Phase 10 (SQLite Native Auth & History)
+
+**Executed:** October 23, 2026  
+**Status:** Successfully Implemented & Verified  
+**Decision References:** ADR D-017, ADR D-018
+
+### Architecture Enhancements:
+1. **Node 22 Native SQLite (`src/lib/db/database.ts`):** Zero-dependency ACID database in WAL mode (`users`, `sessions`, `analyses`, `transactions`).
+2. **Salted Scrypt User Authentication (`app/api/v1/auth/*`):** `crypto.scryptSync` password hashing, constant-time `crypto.timingSafeEqual` comparison, 30-day session tokens, and automatic anonymous guest data migration.
+3. **Persistent Scan History (`app/api/v1/history`):** Real-time analysis persistence, keyword search, pagination, and user-controlled deletion adhering to Privacy by Default.
+4. **Two-Phase Credit Guard & Monetization (`src/lib/payments/*`):** Two-phase credit reservation (`res_xxx`), idempotent append-only credit ledger (`.data/credit_ledger.jsonl`), and PayPal sandbox checkout and capture.
+5. **Quality & Test Metrics:**
+   - `npm run lint` (`tsc --noEmit`): **PASS** (0 errors)
+   - `npm run test` (`vitest run`): **PASS** (19 test files, 218 tests passing with 100% pass rate)
+   - `npm run build` (`next build`): **PASS** (Production compiled successfully)
+
+

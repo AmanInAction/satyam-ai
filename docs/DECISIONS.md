@@ -167,7 +167,13 @@ Record material decisions so the solo developer and coding agent can understand 
      - Journaled transactions (`.data/credit_ledger.jsonl`) record transaction ID, user ID, timestamp, type, amount, balanceAfter, reference, and reason.
   5. **Active Protection UX:**
      - Credit exhaustion never leaves users defenseless: the Essential Scam Safety Guidance card is rendered prominently, delivering vital Indian cybercrime rules (Helpline 1930, never share OTP/UPI PIN, no digital arrest) with direct links to the national reporting portal.
-
-
-
-
+## D-018 — Phase 10: Node 22 Native SQLite for User Authentication, Persistent Scan History, and Data Migration
+- **Date:** 2026-10-23
+- **Status:** Implemented and Verified
+- **Decision:** Implement zero-dependency native SQLite persistence using Node 22's built-in `node:sqlite` (`DatabaseSync`) in WAL mode for persistent user accounts, session tokens, searchable scan history, and financial transactions:
+  1. **Zero-Dependency Native SQLite:** By leveraging Node 22's native `DatabaseSync`, SatyamAI eliminates external native C++ bindings (`better-sqlite3`, `sqlite3`), preventing cross-platform compiler mismatches or container deployment failures while retaining full ACID compliance.
+  2. **Salted Scrypt Cryptography:** User passwords are hashed using Node's standard `crypto.scryptSync(password, salt, 64)` with unique 16-byte cryptographically random salts and constant-time verification (`crypto.timingSafeEqual`).
+  3. **Dual-Mode Session Resolution:** Route handlers transparently accept either 30-day authenticated session tokens (`satyam_session_token` cookie or `Authorization: Bearer` header) or anonymous guest session identifiers (`x-user-id`).
+  4. **Anonymous-to-Account Migration:** When a guest registers or logs in, `migrateUser` and `migrateAnonymousData` automatically transfer all remaining check balances, past transaction ledger rows, and scan records from the anonymous user to the new authenticated user.
+  5. **Privacy-Preserving User History:** Saved analyses in SQLite can be searched by keyword or verdict, retrieved by ID, and deleted either individually or entirely via `DELETE /api/v1/history`, fulfilling Product Principle 5 (Privacy by Default).
+  6. **Automated Test Validation:** 12 dedicated tests in `tests/sqliteAuthHistory.test.ts` verify table creation, user hashing, session expiration, search, privacy deletion, and data migration, bringing the total test suite to 218 passing tests across 19 suites.

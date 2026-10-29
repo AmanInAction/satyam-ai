@@ -17,10 +17,21 @@
 | Method | Path | Priority | Purpose |
 |---|---|---|---|
 | GET | `/api/v1/health` | P0 | Liveness without leaking secrets/configuration |
-| POST | `/api/v1/analyze/text` | P0 | Analyze suspicious text/message/claim |
-| POST | `/api/v1/analyze/url` | P0 | Assess URL using safe parsing and configured reputation/evidence checks |
-| POST | `/api/v1/analyze/image` | P1 | Extract and analyze screenshot content when enabled |
-| POST | `/api/v1/feedback` | P1 | Accept privacy-minimized feedback if enabled |
+| POST | `/api/v1/analyze/text` | P0 | Analyze suspicious text/message/claim (Cost: 1 check) |
+| POST | `/api/v1/analyze/url` | P0 | Assess URL using safe parsing, SSRF defense, and reputation checks (Cost: 1 check) |
+| POST | `/api/v1/analyze/image` | P1 | Extract OCR and analyze screenshot content (Cost: 2 checks) |
+| POST | `/api/v1/auth/register` | P1 | Create user in SQLite, hash password with scrypt, migrate guest data |
+| POST | `/api/v1/auth/login` | P1 | Validate user credentials and issue 30-day session token |
+| GET | `/api/v1/auth/me` | P1 | Get active user profile, auth state, and available checks |
+| POST | `/api/v1/auth/logout` | P1 | Destroy session token and clear authentication cookie |
+| GET | `/api/v1/history` | P1 | Query user's past saved scans with search and pagination |
+| DELETE | `/api/v1/history` | P1 | Delete single scan or clear all history (Privacy by Default) |
+| GET | `/api/v1/payments/credits` | P1 | Retrieve current balance, allowance, and purchase packages |
+| POST | `/api/v1/payments/create-order` | P1 | Generate server-authoritative sandbox payment order |
+| POST | `/api/v1/payments/capture-order` | P1 | Capture payment and idempotently credit purchased checks |
+| GET | `/api/v1/payments/transactions` | P1 | Chronological audit ledger of all balance changes |
+| POST | `/api/v1/payments/webhook` | P1 | Asynchronous webhook handler for payment capture/refund |
+| POST | `/api/v1/telegram/webhook` | P1 | Telegram Bot webhook with deduplication and helpline routing |
 
 Do not implement optional endpoints before their phase. Confirm current route names in the repository before making changes.
 

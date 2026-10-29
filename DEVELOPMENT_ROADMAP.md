@@ -170,6 +170,34 @@ The migration report says the repository was moved to a full-stack Next.js App R
 
 **Gate:** Credit freemium model and PayPal Sandbox purchase flow are real, atomic, idempotent, auditable, and verified end-to-end without regressing core analysis. (PASS - Phase 9 Verified)
 
+## Phase 10 — Node 22 Native SQLite Persistence, User Authentication & Scan History
+**Priority:** P1  
+**Status:** Completed & Verified (2026-10-23)
+
+- [x] **Zero-Dependency Native SQLite Engine (`src/lib/db/database.ts`):**
+  - Powered by Node 22 native `node:sqlite` (`DatabaseSync`) in WAL mode with zero external C++ bindings.
+  - Relational schema (`src/lib/db/schema.ts`): `users`, `sessions`, `analyses`, `transactions`.
+- [x] **Salted Scrypt User Authentication & Session Tokens (`/api/v1/auth/*`):**
+  - Salted password key derivation via `crypto.scryptSync(password, salt, 64)`.
+  - Constant-time verification with `crypto.timingSafeEqual`.
+  - 30-day session token issuance and validation.
+  - `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `GET /api/v1/auth/me`, `POST /api/v1/auth/logout`.
+- [x] **Anonymous-to-Account Data Migration:**
+  - Automatically migrates checks, transaction ledger history, and scan records from anonymous sessions to authenticated accounts upon registration or login.
+- [x] **Searchable Scan History with Privacy Controls (`/api/v1/history`):**
+  - Automatically saves text, URL, and screenshot analyses.
+  - Search by keyword or verdict, pagination, and detail inspection.
+  - Privacy by Default: individual scan deletion and complete history wipe.
+- [x] **UI Integration:**
+  - `AuthModal.tsx` for account creation, login, and profile view.
+  - `HistoryModal.tsx` for searching, viewing, and clearing past scans.
+  - Updated `CreditBar.tsx` with "Scan history" and "Account / Sign in" triggers.
+- [x] **Automated Test Validation:**
+  - 12 dedicated tests in `tests/sqliteAuthHistory.test.ts`.
+  - **218 total repository tests passing across 19 suites (100% pass rate).**
+
+**Gate:** SQLite database, user authentication, data migration, and scan history are verified end-to-end with zero compilation errors and full test coverage. (PASS - Phase 10 Verified)
+
 ## Submission buffer — Nov 13–14
 
 - [ ] Fix critical/submission-blocking bugs only.
