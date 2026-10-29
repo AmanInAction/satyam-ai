@@ -44,7 +44,6 @@ graph TD
 
     subgraph DataPersistence ["Persistence & Storage Layer (ACID)"]
         SQLiteDB["Node 22 Native SQLite (WAL Mode)<br/>- users (salted scrypt)<br/>- sessions (token auth)<br/>- analyses (scan history)<br/>- transactions (audit ledger)"]
-        JSONLJournal["Durable Append-Only Journal<br/>(.data/credit_ledger.jsonl)"]
     end
 
     UI --> SessionParser
@@ -61,7 +60,6 @@ graph TD
     Orchestrator --> VisionOCR
     Orchestrator --> SQLiteDB
     CreditGuard --> SQLiteDB
-    CreditGuard --> JSONLJournal
     PaypalModal --> SQLiteDB
 ```
 

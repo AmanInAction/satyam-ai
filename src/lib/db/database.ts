@@ -366,6 +366,19 @@ export class AppDatabase {
     return query.all(userId, limit) as unknown as DbTransaction[];
   }
 
+  public getAllTransactions(): DbTransaction[] {
+    const query = this.db.prepare('SELECT * FROM transactions ORDER BY created_at ASC');
+    return query.all() as unknown as DbTransaction[];
+  }
+
+  public clearAllTransactions(): void {
+    this.db.exec('DELETE FROM transactions;');
+  }
+
+  public getDatabasePath(): string {
+    return this.dbPath;
+  }
+
   // ----------------------------------------------------
   // Anonymous to Authenticated Data Migration
   // ----------------------------------------------------

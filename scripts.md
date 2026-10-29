@@ -118,9 +118,9 @@ User Request ──> 1. Check Rate Limit
 * **Screenshot / OCR Analysis:** `2 checks`
 * **New Account Welcome Allowance:** `3 checks free`
 
-#### Dual Persistence Guarantee:
-* Every transaction is recorded synchronously in **SQLite** (`transactions` table) AND in an append-only JSONL journal (`.data/credit_ledger.jsonl`).
-* If a server restarts, the ledger auto-reconstructs memory state without losing a single credit.
+#### Unified SQLite ACID Persistence:
+* Every transaction is recorded synchronously in **SQLite** (`transactions` table) in WAL mode.
+* If a server restarts, the ledger hydrates directly from the relational database without relying on flat files.
 
 ---
 
