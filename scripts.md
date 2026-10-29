@@ -1,272 +1,412 @@
-# SatyamAI — Hackathon Presentation & Pitch Master Script (`scripts.md`)
+# SatyamAI — Hackathon Pitch, Live Demo & Technical Presentation Guide
 
-Welcome to the official SatyamAI demonstration, architecture, and pitch guide. This document contains everything you need to deliver an award-winning presentation to hackathon judges, technical evaluators, and investors.
+## Our goal
 
----
+Present SatyamAI as a practical, trustworthy tool that helps people make better decisions when they encounter suspicious messages, links, and viral claims.
 
-## 📑 Table of Contents
-1. [The 3-Minute Elevator Pitch & Live Demo Script](#1-the-3-minute-elevator-pitch--live-demo-script)
-2. [End-to-End User Flow: Login, Credits & Payments](#2-end-to-end-user-flow-login-credits--payments)
-   - [A. The Authentication & Account System](#a-the-authentication--account-system)
-   - [B. Credit Distribution & The Two-Phase Credit Guard](#b-credit-distribution--the-two-phase-credit-guard)
-   - [C. Payment Gateway Sandbox & Monetization Lifecycle](#c-payment-gateway-sandbox--monetization-lifecycle)
-3. [Complete Technology Stack Breakdown](#3-complete-technology-stack-breakdown)
-4. [Key Architectural Innovations & Competitive Differentiators](#4-key-architectural-innovations--competitive-differentiators)
-5. [Judge Q&A Cheat Sheet (Bulletproof Answers)](#5-judge-qa-cheat-sheet-bulletproof-answers)
-6. [Live Verification & Automated Test Metrics](#6-live-verification--automated-test-metrics)
+**Presentation principle:** Show what works. Explain why it matters. Be honest about what is still being validated.
 
 ---
 
-## 1. The 3-Minute Elevator Pitch & Live Demo Script
+# 1. The Three-Minute Pitch and Live Demo
 
-> **Timing Tip:** Practice this with a stopwatch. Keep the browser open on the dedicated checker page (`/analyze`) with the developer console closed.
+## 0:00–0:35 — The problem
 
-### ⏱️ Minute 0:00 – 1:00 | The Problem & The Live Hook
-* **Speaker:**
-  > *"Every single day, millions of citizens across India and globally receive terrifying messages: 'Your electricity will be cut off tonight at 9:30 PM', 'You won a ₹3,500 Diwali cashback—enter your UPI PIN to claim', or video calls claiming a 'digital arrest' warrant from the Cyber Crime Police.*
-  >
-  > *Over $1.4 Billion is lost to online financial fraud annually in India alone. When people panic, they don't have hours to investigate. Asking generic chatbots often results in fabricated hallucinations or dangerous advice.*
-  >
-  > *This is why we built **SatyamAI** — an India-aware, decision-support platform that combines deterministic threat detection, live evidence retrieval, and AI reasoning to give instant, transparent safety evaluations."*
+**Speaker script**
 
-* **Live Action on Screen:**
-  1. Open `/analyze`.
-  2. Click the preset scenario: **"Electricity Disconnection Threat"**.
-  3. Click **"Check message"**.
-  4. In **under 500 milliseconds**, the dual-classification card appears:
-     - 🚨 **Scam/Security Threat:** `LIKELY SCAM` (High Risk — Utility Impersonation).
-     - ⚖️ **Factual Claim Verification:** `UNVERIFIED / DISPROVEN` (Official disclaimers).
-     - 🛡️ **Actionable Safety Protocol:** *"Power utilities never send personal SMS threats warning of disconnection tonight with an unofficial phone number. Never pay outside official portals."*
-     - 📞 **One-Click Helpline:** Indian National Cyber Crime Helpline `1930` and `cybercrime.gov.in`.
+Imagine receiving a message saying your electricity will be disconnected tonight unless you pay immediately.
 
----
+Or a message promising a cash reward if you enter your UPI PIN.
 
-### ⏱️ Minute 1:00 – 2:00 | Login, Credit Engine & Payment Gateway Sandbox
-* **Speaker:**
-  > *"To build a sustainable, production-ready product, we engineered a secure freemium monetization and user account model from day one.*
-  >
-  > *Notice our credit bar at the top: every new user immediately gets **3 free checks** upon their first visit without any sign-up friction. But here is the magic:*
-  >
-  > *If I click **'Sign in'** and create a permanent account, our backend automatically migrates all my guest check credits and past scan history seamlessly into my SQLite account."*
+The problem isn't simply that these messages may be fraudulent. It's that they are designed to make people panic, trust the wrong source, and act before checking the facts.
 
-* **Live Action on Screen:**
-  1. Click **"Scan history"** on the Credit Bar: Show the scan we just performed saved persistently with time, verdict badge, and preview.
-  2. Click **"Sign in"** &rarr; Toggle to **"Create Account"**: Register a test account (`demo@satyam.ai`, `Password123!`).
-  3. Notice the green badge: **"Demo User (Active & Synced)"** appears on the credit bar with all 3 credits intact!
-  4. Click **"Get more checks"**: Show the payment modal.
-  5. Select the **Value Pack (25 Checks / $5.00)** and show the Sandbox Payment Gateway checkout.
-  6. Click **"Receipts"**: Open the ledger drawer showing the complete audit trail:
-     - `Freemium Welcome Bonus (+3)`
-     - `TEXT Analysis Debit (-1)`
-     - Real-time running balance calculation.
+And even a message containing a true fact can be used to carry out a scam.
 
----
+We built **SatyamAI** to help people pause, examine the warning signs, and make a more informed decision.
 
-### ⏱️ Minute 2:00 – 3:00 | Architecture, Deep Tech & Closing Punch
-* **Speaker:**
-  > *"Under the hood, SatyamAI is not a toy wrapper. It is built as a hardened, full-stack application:*
-  >
-  > 1. **Zero-Dependency Native SQLite:** *We leverage Node 22's built-in `node:sqlite` in WAL (Write-Ahead Logging) mode. It provides ACID transactions, zero native C++ compilation vulnerabilities, and blazingly fast in-process query execution.*
-  > 2. **Two-Phase Credit Reservation:** *We prevent race conditions using a strict 2-phase reservation protocol (`reserveCredits` &rarr; analysis &rarr; `commitReservation` on success, or `releaseReservation` if anything aborts). Users are never billed for failed analyses.*
-  > 3. **SSRF & Adversarial Defenses:** *Every URL check is protected against loopback (127.0.0.1) and AWS/GCP cloud metadata IP exploitation (`169.254.169.254`). Prompt-injection payloads in submitted text are isolated from the classification pipeline.*
-  > 4. **Multi-Channel Delivery:** *We also provide a full Telegram Bot webhook endpoint (`/api/v1/telegram/webhook`) sharing the exact same pipeline.*
-  >
-  > *All of this is backed by **218 automated tests passing across 19 suites with 100% coverage**. SatyamAI is fast, transparent, and battle-tested for real-world deployment. Thank you!"*
+## 0:35–1:35 — The live demonstration
 
----
+**Action on screen**
 
-## 2. End-to-End User Flow: Login, Credits & Payments
+1. Open the SatyamAI checker at `/analyze`.
+2. Select the electricity-disconnection example or paste a prepared suspicious message.
+3. Click **Check message**.
+4. Show the resulting assessment.
 
-### A. The Authentication & Account System
+**Speaker script**
 
-SatyamAI implements a **Dual-Mode Session Architecture**:
-1. **Zero-Barrier Anonymous Guests:**
-   - On the first HTTP request, `src/lib/payments/userSession.ts` assigns a unique `satyam_user_id` cookie and `x-user-id` header.
-   - The user immediately receives the `FREE_INITIAL_CREDITS = 3` freemium welcome bonus without entering an email.
-2. **Persistent User Accounts (SQLite):**
-   - Built in `src/lib/db/database.ts` storing data in `.data/satyam.sqlite`.
-   - **Password Security:** Salted cryptographic key derivation using Node's native `crypto.scryptSync(password, salt, 64)`.
-   - **Constant-Time Verification:** Tested using `crypto.timingSafeEqual` to prevent side-channel timing attacks.
-   - **Session Tokens:** 32-byte cryptographically secure random hex tokens stored in the `sessions` table and issued via `satyam_session_token` HTTP-only cookies.
-3. **Automatic Anonymous-to-Account Migration:**
-   - When a guest user decides to register or log in, `defaultCreditLedger.migrateUser(guestId, authenticatedUserId)` transfers:
-     - All remaining check balances.
-     - The entire transaction audit history.
-     - All previous scan records in the `analyses` table.
-   - **Result:** Zero data loss, zero frustration for the user.
+Let's see how it works.
 
----
+I've submitted a message that claims the recipient's electricity will be disconnected unless they act urgently.
 
-### B. Credit Distribution & The Two-Phase Credit Guard
+SatyamAI examines the message for warning signs, such as urgency, impersonation, and suspicious payment requests. It can also use available evidence to help assess relevant factual claims.
 
-To prevent fraud, negative balances, and API abuse, SatyamAI uses a server-authoritative **Two-Phase Credit Reservation Engine** (`src/lib/payments/creditGuard.ts` & `src/lib/payments/ledger.ts`):
+The result is designed to answer three practical questions:
 
-```
-User Request ──> 1. Check Rate Limit
-             ──> 2. checkAndReserveCredits(req, type)
-                    ├─ Verify available >= cost (Text/URL: 1 credit, Image: 2 credits)
-                    └─ Create reservation (res_xxx) with 2-minute TTL
-             ──> 3. Execute Analysis (Deterministic Rules + AI Provider)
-             ──> 4. finalizeCreditUsage(reservation, analysisId, success)
-                    ├─ IF SUCCESS: Commit debit transaction, reduce balance
-                    └─ IF FAILURE: Auto-release reservation, restore available credits
-```
+- What looks suspicious?
+- What evidence is available?
+- What should I do next?
 
-#### Credit Costs:
-* **Text / Claim Check:** `1 check`
-* **URL / Domain Reputation:** `1 check`
-* **Screenshot / OCR Analysis:** `2 checks`
-* **New Account Welcome Allowance:** `3 checks free`
+Instead of simply returning a score, SatyamAI explains the reasons behind its assessment and provides practical guidance.
 
-#### Dual Persistence Guarantee:
-* Every transaction is recorded synchronously in **SQLite** (`transactions` table) AND in an append-only JSONL journal (`.data/credit_ledger.jsonl`).
-* If a server restarts, the ledger auto-reconstructs memory state without losing a single credit.
+For example, a user should verify a billing problem through the electricity provider's official website or customer-service number rather than relying on contact details supplied in a threatening message.
+
+The purpose is not to make decisions for people. It's to give them useful information before they act.
+
+**Demo note:** Show the actual result returned by the application. Only mention sources that appear in the result. Do not claim that an official source disproves a message unless the displayed evidence supports that conclusion.
+
+## 1:35–2:10 — What makes SatyamAI different?
+
+**Speaker script**
+
+One important design decision is that SatyamAI separates two questions that are often confused.
+
+First: **Does this message show signs of a scam?**
+
+Second: **Is the factual claim supported by evidence?**
+
+These are different questions.
+
+A genuine government scheme can be used as bait in a fraudulent message. A suspicious message can also contain a factual statement that happens to be true.
+
+By separating scam risk from factual accuracy, we can give users a more useful explanation instead of reducing everything to a single verdict.
+
+And when the available evidence isn't enough, the result should say so. We don't want people to mistake an uncertain result for a guarantee of safety.
+
+## 2:10–2:35 — From the website to Telegram
+
+**Action on screen**
+
+Open the working SatyamAI Telegram bot and demonstrate a message check.
+
+**Speaker script**
+
+We also bring this experience to Telegram, where people already receive and share suspicious messages.
+
+Users can send messages to the bot and receive an assessment through the same core analysis system.
+
+That gives SatyamAI another practical way to reach people without requiring them to learn a new workflow.
+
+## 2:35–3:00 — Closing
+
+**Speaker script**
+
+Our goal with SatyamAI is straightforward: help people recognize warning signs, examine available evidence, and make safer decisions online.
+
+We're combining India-aware scam detection, factual-claim assessment, and clear guidance in one accessible experience.
+
+We know no automated system can identify every scam or establish the truth of every claim. That's why transparency and uncertainty are part of the product, not afterthoughts.
+
+SatyamAI is our effort to make checking before trusting a little easier.
+
+Thank you.
 
 ---
 
-### C. Payment Gateway Sandbox & Monetization Lifecycle
+# 2. End-to-End Product Walkthrough: Accounts, Credits and Payments
 
-SatyamAI is integrated with a payment sandbox engine (`src/lib/payments/paypalClient.ts` / extensible to Razorpay) adhering to strict enterprise payment standards:
+This section is for a longer demonstration or technical evaluation. It should not all be included in the three-minute pitch.
 
-1. **Order Creation (`POST /api/v1/payments/create-order`):**
-   - The user selects a pack:
-     - **Starter:** 10 Checks for $2.00 (₹160)
-     - **Value (Popular):** 25 Checks for $5.00 (₹400)
-     - **Pro:** 60 Checks for $10.00 (₹800)
-   - The backend validates the package against `CREDIT_PACKAGES` and generates a server-side order with currency matching and intent validation.
-2. **Client Sandbox Approval:**
-   - The user approves the purchase in the sandbox popup/redirect.
-3. **Order Capture & Cryptographic Idempotency (`POST /api/v1/payments/capture-order`):**
-   - The server verifies order status (`COMPLETED` or `APPROVED`).
-   - Checks against unapproved or cancelled orders (returns HTTP 422 `ORDER_NOT_APPROVED` or `ORDER_CANCELLED`).
-   - Verifies the captured amount exactly matches the server package price.
-   - **Idempotency Guard:** `redeemedOrders` cache and unique SQL index on `idempotency_key` prevent duplicate crediting even under concurrent double-click attempts.
-4. **Webhook Security (`POST /api/v1/payments/webhook`):**
-   - Captures asynchronous events (`PAYMENT.CAPTURE.COMPLETED`).
-   - Validates webhook signature.
-   - Automatically credits user if not already credited, or reconciles refunds (`refund_reversal`).
-5. **Razorpay Mapping (For Indian Payment Rails):**
-   - Easily mapped to Razorpay Orders API (`razorpay.orders.create`) and Razorpay Webhook Signatures (`x-razorpay-signature`) via SHA-256 HMAC verification.
+## A. Guest access and user accounts
+
+**What to demonstrate**
+
+- Open the checker as a new guest.
+- Show the initial allowance of three free checks, if verified in the current build.
+- Perform an analysis and show the updated balance.
+- If account registration and guest migration have been verified, demonstrate signing in and retaining the appropriate balance.
+
+**Suggested explanation**
+
+We want users to try the core experience without unnecessary friction. The product uses a credit allowance so people can test the service before deciding whether they need additional checks.
+
+The backend is responsible for maintaining balances and recording credit usage. The interface displays that information, but it does not determine how many credits a user owns.
+
+**Technical details for judges**
+
+The implementation describes:
+
+- Guest sessions using a `satyam_user_id` cookie.
+- Account sessions using an HTTP-only `satyam_session_token` cookie.
+- Password hashing using Node.js cryptographic functions.
+- Account migration for guest balances and eligible history.
+
+Verify the current implementation and persistence behavior before claiming that all guest history and balances migrate without loss.
+
+Never use a real personal account or password during a public demonstration.
+
+## B. Credit usage and reservations
+
+The documented credit costs are:
+
+| Analysis type | Credit cost |
+|---|---:|
+| Text analysis | 1 |
+| URL analysis | 1 |
+| Screenshot analysis | 2 |
+| Initial free allowance | 3 |
+
+These values should match the actual configuration and user interface before the presentation.
+
+**Suggested explanation**
+
+The credit system is designed to reserve the required balance before an analysis begins and finalize the deduction after the result is produced. If an analysis fails, the system should release the reservation rather than charge the user for an unsuccessful check.
+
+The important engineering challenge is ensuring that simultaneous requests, retries, and failed operations don't create incorrect balances.
+
+The current implementation should be described as using a reservation protocol only where that behavior has been verified in the relevant routes.
+
+## C. PayPal Sandbox and monetization
+
+**Demonstrate this section only after completing an actual Sandbox transaction.**
+
+The documented package proposals are:
+
+| Package | Checks | Price |
+|---|---:|---:|
+| Starter | 10 | $2.00 |
+| Value | 25 | $5.00 |
+| Pro | 60 | $10.00 |
+
+Verify these prices and packages against the current server configuration before presenting them.
+
+**Suggested explanation**
+
+SatyamAI has a credit-based payment model. Users can purchase additional checks, while the backend validates the order and payment before granting credits.
+
+The intended flow is:
+
+1. The server creates an order.
+2. The buyer approves it through PayPal.
+3. The server captures and verifies the payment.
+4. The ledger grants the corresponding credits once.
+5. Webhook notifications help reconcile payment events.
+
+We test this integration using PayPal Sandbox before considering any live payment rollout.
+
+**Important verification requirements**
+
+- A completed Sandbox transaction must be demonstrated before describing the flow as end-to-end verified.
+- Credits must match the purchased package.
+- Duplicate capture attempts and webhook deliveries must not grant credits twice.
+- Cancelled, pending, denied, refunded, or reversed payments must be handled according to the implemented payment lifecycle.
+- Sandbox activity must not be presented as real customer revenue.
+
+Do not show the payment section if the buyer-approval flow, capture, or credit grant is still failing.
 
 ---
 
-## 3. Complete Technology Stack Breakdown
+# 3. Technology Stack and Architecture
 
-| Layer | Technology | Rationale & Advantage |
+## A. Technology overview
+
+The project's documented stack includes:
+
+| Layer | Technology | Purpose |
 |---|---|---|
-| **Framework** | Next.js 15+ (App Router) | React Server Components, high performance, streaming, serverless route handlers |
-| **Language** | TypeScript 5.7+ | End-to-end type safety, strict compile checks, zero runtime type errors |
-| **Styling** | Tailwind CSS v4 | High-contrast light theme, accessible ARIA roles, responsive mobile & desktop UI |
-| **Database** | Node 22 Native SQLite (`node:sqlite`) | ACID compliance, WAL mode, zero native C++ build dependencies, portable |
-| **Validation** | Zod 3.24+ | Strict schema validation on all inputs, query params, and API responses |
-| **Deterministic Engine** | Custom Regex & Pattern Matchers | Instant (<2ms) detection for OTP traps, UPI PIN scams, electricity & digital arrest threats |
-| **AI Layer** | Amazon Bedrock & Gemini API Adapter | Server-side LLM inference with structured JSON output and graceful fallback |
-| **Evidence Retrieval** | Google Fact Check & Safe Browsing | Attributable citations with publisher, canonical URL, and truthfulness finding |
-| **Security Defenses** | SSRF Validator & In-Memory Rate Limiter | Blocks loopback, cloud metadata IPs (`169.254.169.254`), and brute-force flooding |
-| **Testing** | Vitest 4 | Blazingly fast unit & integration tests; **218 tests passing across 19 suites** |
+| Application | Next.js App Router | Website and server-side API routes |
+| Language | TypeScript | Typed application code |
+| UI | Tailwind CSS and shared components | Responsive interface |
+| Validation | Zod | Request and response validation |
+| AI reasoning | Amazon Bedrock | Contextual analysis |
+| Detection | Deterministic rules | Recognition of known scam patterns |
+| Evidence | External evidence and reputation adapters | Additional context for assessments |
+| Storage | SQLite and/or JSONL ledger, according to the deployed configuration | Account, history, or credit persistence |
+| Testing | Vitest | Automated verification |
+
+Confirm the actual dependencies and implementation before presenting this table as the current stack. Amazon Bedrock is the project's designated primary AI platform; do not describe another model provider as an active fallback unless it is genuinely configured and supported.
+
+## B. How an analysis works
+
+The high-level workflow is:
+
+1. A user submits text, a link, or a supported screenshot.
+2. Input validation and security checks run.
+3. Credit and rate-limit checks are applied where configured.
+4. Deterministic rules identify recognizable warning signs.
+5. Available evidence and AI-assisted reasoning contribute to the assessment.
+6. The application returns a result with an appropriate level of uncertainty.
+7. The system records the relevant outcome and finalizes credit usage according to the implemented workflow.
+
+**Suggested explanation for judges**
+
+We use multiple signals rather than relying entirely on a language model's answer. Recognizable patterns can be handled by deterministic rules, while contextual reasoning helps assess less obvious messages.
+
+External evidence can provide additional context, but a source being related to a topic does not automatically prove a claim. The application must distinguish useful evidence from unrelated or inconclusive results.
+
+The goal is to provide a reasoned assessment, not to claim that every message can be classified with certainty.
+
+## C. Security and privacy
+
+The documented security measures include URL validation intended to mitigate server-side request forgery, input validation, prompt-injection defenses, rate limiting, and server-side payment checks.
+
+**Suggested explanation**
+
+Security is part of the design because this product processes potentially malicious content. We validate submitted inputs, apply restrictions to URL analysis, and keep payment verification on the server.
+
+We also aim to minimize unnecessary storage of submitted content. Account history and credit records require their own access, retention, and deletion controls.
+
+These protections reduce specific risks, but they don't eliminate every possible attack. Deployment configuration, storage durability, and operational monitoring remain important parts of a production review.
 
 ---
 
-## 4. Key Architectural Innovations & Competitive Differentiators
+# 4. What Makes SatyamAI Useful?
 
-```
-                       ┌──────────────────────────────────────────────┐
-                       │          User Submission (Text/URL/Img)      │
-                       └──────────────────────┬───────────────────────┘
-                                              ▼
-                                 [ SSRF & Rate Limiter ]
-                                              ▼
-                                 [ Two-Phase Credit Guard ]
-                                              ▼
-                         ┌────────────────────┴────────────────────┐
-                         ▼                                         ▼
-            [ Deterministic Rules Engine ]           [ External Adapters ]
-            - Hindi / Hinglish Patterns              - Google Fact Check Tools
-            - UPI PIN / QR Reversals                 - Safe Browsing / URL Rep.
-            - Electricity / Digital Arrest           - OCR / Vision Extraction
-                         └────────────────────┬────────────────────┘
-                                              ▼
-                                 [ AI Orchestrator (Bedrock) ]
-                                 - Evidence Synthesis
-                                 - Contextual Reasoning
-                                              ▼
-                         ┌────────────────────┴────────────────────┐
-                         ▼                                         ▼
-            [ Scam Risk Assessment ]                 [ Claim Verification ]
-            - Likely Scam / Suspicious               - Verified True / False
-            - Urgency & Psychological Traps          - Attributable Source Links
-                         └────────────────────┬────────────────────┘
-                                              ▼
-                                 [ SQLite & Journal Persistence ]
-                                 - Save Analysis to Scan History
-                                 - Commit Credit Deduction (-1)
-```
+## A. Separate scam risk from factual accuracy
 
-### 1. Dual-Risk Separation (Our Core Innovation)
-Most AI tools lump everything into "safe" or "unsafe". SatyamAI separates:
-* **Dimension 1: Fraud/Security Risk** (e.g., Is this message trying to steal money, harvest OTPs, or install malicious APKs?).
-* **Dimension 2: Factual Accuracy** (e.g., Did a politician actually say this? Is this government policy real?).
-* *Why it matters:* A message can contain a completely true fact (e.g. "Govt announces new subsidy") used as a lure to execute a phishing scam! Collapsing them into one verdict misleads victims.
+SatyamAI assesses two different dimensions:
 
-### 2. India-Centric Scam Intelligence
-Trained and tested against local fraud patterns:
-* **UPI PIN Trap:** Reminding users that entering a UPI PIN *never* receives money—it only sends money.
-* **Fake Electricity Disconnection:** Detecting the viral SMS threats threatening power cutoffs at 9:30 PM.
-* **Fake "Digital Arrest":** Debunking the fear tactic by citing Indian law: police or courts never conduct arrest or demand deposits via Skype/WhatsApp video calls.
-* **Multilingual Handling:** Full support for English, Hindi (Devanagari), and Hinglish (colloquial Roman script).
+- **Scam and security risk:** whether a message shows signs of phishing, impersonation, coercion, or other fraudulent behavior.
+- **Factual accuracy:** whether a factual claim is supported or contradicted by the available evidence.
 
-### 3. Transparent Uncertainty & Citations
-* If no credible sources exist, SatyamAI explicitly displays **"Unverified — Insufficient Evidence"**, clearly reminding the user that *"Absence of evidence is not evidence of safety."*
-* Every fact-check links to the original publisher (e.g., PIB Fact Check, AltNews, BOOM Live) with canonical URLs.
+Keeping these dimensions separate helps prevent a true statement from making a fraudulent message appear trustworthy.
+
+## B. India-aware scam patterns
+
+The documented rule set includes patterns associated with:
+
+- UPI and OTP-related fraud.
+- Fake KYC and account-blocking alerts.
+- Electricity-disconnection threats.
+- Digital-arrest extortion.
+- Suspicious prize and task messages.
+- Hindi and Hinglish scam language.
+
+These examples should be demonstrated using actual application results, not only screenshots or prepared claims.
+
+## C. Uncertainty and evidence
+
+When evidence is insufficient, the application should communicate that limitation rather than manufacture certainty.
+
+A result should explain what was checked, what was found, and what remains unknown. Citations should link to relevant sources and must not imply stronger support than those sources provide.
+
+## D. Multi-channel access
+
+The website and Telegram bot are two interfaces to the same core analysis system.
+
+This reduces the need to maintain separate scam-detection logic for each interface and gives users another way to access the service.
 
 ---
 
-## 5. Judge Q&A Cheat Sheet (Bulletproof Answers)
+# 5. Judge Q&A Preparation
 
-#### Q1: "Why not just use ChatGPT or Claude directly?"
-> **Answer:** *"LLMs alone suffer from two fatal flaws in cybersecurity: hallucinations and knowledge cutoff. A prompt to ChatGPT cannot check if a freshly registered domain is malicious or whether power was cut off in Jaipur today. SatyamAI combines deterministic scam patterns, live domain reputation telemetry, official fact-check databases, and uses the LLM solely as a contextual synthesizer. Furthermore, SatyamAI enforces strict Indian cybersecurity guardrails and helpline routing that generic LLMs omit."*
+## Q1. Why not use a general-purpose chatbot?
 
-#### Q2: "How do you protect users' privacy?"
-> **Answer:** *"We adhere to 'Privacy by Default' (Product Principle 5). We do not store personal contact information or raw credentials. In the scan history, users have complete control: they can inspect each past analysis, delete individual items, or execute a 'Clear All History' action that instantly wipes records from the SQLite database."*
+**Answer:**
 
-#### Q3: "What happens if a user tries to double-spend or bypass credits?"
-> **Answer:** *"All credit balances are strictly server-authoritative. The client never tells the server how many credits it has. In addition, our two-phase credit guard acquires an in-memory lock per user, reserves the required credits before the analysis starts, and only commits upon success. Double-clicking or parallel requests are serialized and rejected if available balance is insufficient."*
+A general-purpose chatbot can explain a suspicious message, but SatyamAI is designed around a more focused workflow. It combines known scam-pattern checks, available external evidence, and contextual reasoning.
 
-#### Q4: "How does the app scale if traffic spikes?"
-> **Answer:** *"The deterministic rules run in memory in less than 2 milliseconds, handling high-frequency viral scams without calling the LLM at all. The SQLite database runs in WAL mode, allowing non-blocking concurrent readers while writes execute sequentially without locking up the event loop."*
+It also separates fraud risk from factual accuracy and provides practical next steps. We don't claim that this approach eliminates hallucinations or guarantees a correct verdict; instead, we aim to make the assessment more transparent and useful.
+
+## Q2. How do you reduce false positives and false negatives?
+
+**Answer:**
+
+We use deterministic rules for recognizable patterns and contextual reasoning for more complex cases. We also need to evaluate the system against legitimate messages, different scam categories, multilingual examples, and cases where evidence is inconclusive.
+
+No detection system is perfect. Our focus is to improve the quality of the assessment and communicate uncertainty instead of treating every output as definitive.
+
+## Q3. How do you protect user privacy?
+
+**Answer:**
+
+We aim to minimize the information retained from user submissions. The system's account, history, and credit features have separate storage requirements, and those records need appropriate access and deletion controls.
+
+Our privacy claims are tied to the actual storage behavior of the deployed application. We don't treat the absence of raw-message storage as proof that every form of user data is absent.
+
+## Q4. How do you prevent users from manipulating credits?
+
+**Answer:**
+
+The backend controls credit balances and validates the operations that consume or add credits. The payment flow is designed to validate the captured amount and currency and prevent duplicate credit grants.
+
+We also test concurrent requests and duplicate events. The strength of those protections depends on the correctness and durability of the storage and transaction implementation.
+
+## Q5. What happens when the AI provider is unavailable?
+
+**Answer:**
+
+The application is designed to handle provider failures without automatically treating a message as safe. Deterministic checks may still identify recognizable warning signs, while results requiring unavailable evidence or reasoning should communicate the limitation.
+
+The exact behavior depends on the type of analysis and which components remain available.
+
+## Q6. How does SatyamAI handle factual claims?
+
+**Answer:**
+
+The system attempts to identify claims and assess them using available evidence. It should distinguish supporting evidence, contradictory evidence, mixed findings, and cases where the available sources are insufficient.
+
+Finding a related article is not enough to verify a claim. The relationship between the claim and the evidence matters.
+
+## Q7. Is the project production-ready?
+
+**Answer:**
+
+SatyamAI has a substantial working implementation covering analysis, multiple input types, Telegram access, and a credit-based payment design. We are validating the complete payment flow and the reliability of the deployed environment before treating the product as production-ready.
+
+We would rather identify those limitations honestly than claim that passing automated tests guarantees operational readiness.
+
+## Q8. How would you improve the product next?
+
+**Answer:**
+
+Our immediate priorities are reliable payment processing, evidence quality, security and privacy validation, and a simpler consumer experience. We want users to understand a result quickly and know what to do next.
+
+After those foundations are dependable, feedback from real users will guide which additional features are worth building.
 
 ---
 
-## 6. Live Verification & Automated Test Metrics
+# 6. Verification and Demo Readiness
 
-SatyamAI includes one of the most comprehensive automated test suites built for a hackathon project:
+## A. Run the verification commands
+
+From the repository root, use the commands configured by the project:
 
 ```bash
-# Run the test suite:
 npm run test
-
-# Run TypeScript type verification:
-npm run lint
-
-# Build production bundle:
 npm run build
 ```
 
-### Verified Test Results:
-* **Total Test Suites:** `19 passed (19)`
-* **Total Automated Tests:** `218 passed (218)`
-* **Execution Time:** `~37 seconds`
-* **Test Suites Breakdown:**
-  - `tests/sqliteAuthHistory.test.ts` (12 tests) — Database CRUD, password hashing, session tokens, search & privacy deletion.
-  - `tests/paymentsMonetization.test.ts` (14 tests) — Credit distribution, reservations, and idempotency.
-  - `tests/paypalApprovalCapture.test.ts` (10 tests) — Sandbox order creation, capture validation, and webhook security.
-  - `tests/evaluationBenchmark.test.ts` (21 tests) — Comprehensive adversarial benchmark across 17 real-world scam categories.
-  - `tests/urlSecurity.test.ts` (23 tests) — SSRF protection, loopback, and metadata blocking.
-  - `tests/deterministicRules.test.ts` (22 tests) — UPI, KYC, electricity, and Hindi/Hinglish threat detection.
-  - `tests/claimVerification.test.ts` (15 tests) — Factual claim verification, evidence scoring, and uncertainty discipline.
-  - `tests/imageSecurity.test.ts` (13 tests) — Screenshot upload safety, MIME validation, and OCR bounds.
-  - `tests/orchestrator.test.ts` (5 tests) — Multi-signal orchestration and fallback resilience.
+Run the dedicated TypeScript check if the project defines one. Do not assume that `npm run lint` performs type checking; inspect `package.json`.
 
----
+Record the actual results from the current repository immediately before the presentation.
 
-*SatyamAI is production-tested, mathematically backed by 218 automated tests, and ready for deployment.*
+## B. Report results accurately
+
+| Check | What to record |
+|---|---|
+| Automated tests | Actual passed, failed, and skipped totals |
+| TypeScript | Actual typecheck result |
+| Production build | Actual build result |
+| Code coverage | Measured coverage, if collected |
+| Text analysis | Tested result and known limitations |
+| URL analysis | Tested result and known limitations |
+| Screenshot analysis | Tested result and known limitations |
+| Telegram | Actual end-to-end result |
+| PayPal Sandbox | Actual completed transaction or not yet verified |
+| Deployment | Local, staging, or public environment |
+
+Do not reuse historical test counts without rerunning the tests. Passing tests do not establish 100% code coverage, perfect detection, or production readiness.
+
+## C. Live-demo preparation checklist
+
+Before recording or presenting:
+
+- [ ] Confirm the deployed application opens correctly.
+- [ ] Test the chosen message against the current analysis pipeline.
+- [ ] Ensure displayed evidence is relevant and attributable.
+- [ ] Confirm the verdict and explanation match the actual response.
+- [ ] Test the Telegram bot if it is part of the demonstration.
+- [ ] Demonstrate PayPal only if a Sandbox purchase has completed successfully.
+- [ ] Use disposable demo accounts and never expose tokens or secrets.
+- [ ] Keep a prepared example available in case an external service fails.
+- [ ] Clearly distinguish a prepared example from a live analysis.
+- [ ] Close unrelated tabs and hide personal information before recording.
+
+## D. Final presentation principle
+
+SatyamAI is intended to help people make more informed decisions about suspicious messages and claims. Its value comes from combining practical detection, available evidence, clear explanations, and honest communication about uncertainty.
+
+We should demonstrate the product's actual capabilities, explain the engineering choices that support them, and be transparent about the limitations that remain.
+
+**A credible demonstration of a working product is stronger than a list of promises about a perfect one.**
