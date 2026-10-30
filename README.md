@@ -295,5 +295,31 @@ npm run build
 
 ---
 
+## 💳 Step-by-Step Payment Sandbox Configuration & Testing Guide
+
+Follow this definitive sequence to deploy, test, and verify the payment sandbox system without breaking environment sessions or risking real-world funds.
+
+### Phase 1: Gateway Account Provisioning
+1. **Access the Portal:** Navigate to the [PayPal Developer Dashboard](https://paypal.com) and authenticate using standard credentials.
+2. **Locate Testing Tools:** Expand the left-hand sidebar layout, locate the **Testing Tools** dropdown, and click **Sandbox Accounts**.
+3. **Generate Default Personas:** The platform auto-provisions a baseline sandbox architecture consisting of:
+   * **Merchant Endpoint (`sb-xxxx@://example.com`):** Serves as the receiving node for system API integrations.
+   * **Buyer Endpoint (`sb-xxxx@://example.com`):** Acts as the test customer account pre-loaded with simulated currency assets.
+4. **Extract Test Credentials:** Click the options trigger (**…**) adjacent to the designated personal profile, select **View/Edit Account**, and securely record the generated email address string along with its corresponding system password.
+
+### Phase 2: Transaction Session Execution
+1. **Enforce Browser Isolation:** Launch a completely isolated **Incognito / Private Browsing window** to block cross-domain session noise and native cookie interference between developer dashboard panels and the checkout platform.
+2. **Access the Client Dashboard:** Navigate to the running interface (`http://localhost:3000`), complete authentication, and trigger the credit checkout sequence via the top-up interface wrapper.
+3. **Inject Simulated Identity:** When the official payment gateway frame initializes, bypass all authentic production details. Populate the primary inputs using the mock **Personal Sandbox Email and Password** extracted during Phase 1.
+4. **Confirm Authorization:** Execute the checkout option inside the secure portal frame using the simulated, pre-allocated balance reserves.
+
+### Phase 3: Comprehensive Pipeline Verification
+Confirm that data packets traveled through the application safely by verifying the transaction down three paths:
+* **The Buyer Verification:** Sign in directly to [://paypal.com](https://www.://paypal.com/) with the mock customer credentials to check the balance ledger reductions and look over the transaction history.
+* **The DB Transaction History:** Query the native SQLite audit engine via `GET /api/v1/payments/transactions` to verify that the entry rows match, and check the live user layout to see that the credits updated instantly.
+* **The Webhook Telemetry:** Check the **Notifications Log** inside the developer dashboard to confirm that the platform fired the mock webhooks cleanly and the server caught them.
+
+---
+
 ## 📄 License
 This project is licensed under the MIT License.
