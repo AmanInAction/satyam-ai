@@ -44,6 +44,7 @@ graph TD
 
     subgraph DataPersistence ["Persistence & Storage Layer (ACID)"]
         SQLiteDB["Node 22 Native SQLite (WAL Mode)<br/>- users (salted scrypt)<br/>- sessions (token auth)<br/>- analyses (scan history)<br/>- transactions (audit ledger)"]
+        
     end
 
     UI --> SessionParser
