@@ -5,7 +5,9 @@ import { POST as registerHandler } from '../app/api/v1/auth/register/route';
 import { POST as loginHandler } from '../app/api/v1/auth/login/route';
 import { GET as meHandler } from '../app/api/v1/auth/me/route';
 import { GET as historyGetHandler, DELETE as historyDeleteHandler } from '../app/api/v1/history/route';
-import { defaultCreditLedger } from '../src/lib/payments/ledger';
+import { CreditLedgerService, defaultCreditLedger } from '../src/lib/payments/ledger';
+import fs from 'fs';
+import path from 'path';
 
 describe('SQLite Database & Auth Service', () => {
   let db: AppDatabase;
@@ -141,6 +143,37 @@ describe('SQLite Database & Auth Service', () => {
     const userRecords = db.getAnalysesByUser(registeredUser.id);
     expect(userRecords.length).toBe(1);
     expect(userRecords[0].id).toBe('analysis_anon_1');
+  });
+
+  it('migrates legacy credit_ledger.jsonl into SQLite and unlinks the file', async () => {
+    const tempDir = path.join(process.cwd(), '.temp-migration-test');
+    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+
+    const legacyFile = path.join(tempDir, 'credit_ledger.jsonl');
+    const sampleTx = {
+      id: 'tx_legacy_101',
+      userId: 'usr_legacy_user',
+      timestamp: new Date().toISOString(),
+      type: 'initial_grant',
+      amount: 3,
+      balanceAfter: 3,
+      reason: 'Freemium Welcome Bonus',
+      idempotencyKey: 'legacy_grant_101',
+    };
+    fs.writeFileSync(legacyFile, JSON.stringify(sampleTx) + '\n', 'utf8');
+    expect(fs.existsSync(legacyFile)).toBe(true);
+
+    const migrationLedger = new CreditLedgerService(tempDir);
+
+    // Verify file unlinked
+    expect(fs.existsSync(legacyFile)).toBe(false);
+
+    // Verify transaction loaded in SQLite and ledger
+    const balance = await migrationLedger.getBalance('usr_legacy_user');
+    expect(balance.balance).toBe(3);
+
+    // Clean up
+    fs.rmSync(tempDir, { recursive: true, force: true });
   });
 });
 

@@ -34,10 +34,15 @@ export class CreditLedgerService {
       if (!fs.existsSync(dataDir)) {
         fs.mkdirSync(dataDir, { recursive: true });
       }
-      this.journalPath = path.join(dataDir, 'credit_ledger.jsonl');
-      this.loadJournal();
+
+      // 1. One-time legacy migration: if credit_ledger.jsonl exists, migrate all rows to SQLite
+      const legacyJournalPath = path.join(dataDir, 'credit_ledger.jsonl');
+      this.migrateLegacyJournalIfPresent(legacyJournalPath);
+
+      // 2. Load all historical transactions from SQLite
+      this.loadFromSQLite();
       this.isDurable = true;
-      safeLogger.info(`Credit ledger initialized with durable storage at: ${this.journalPath}`);
+      safeLogger.info(`Credit ledger initialized with durable SQLite storage at: ${defaultDb.getDatabasePath()}`);
     } catch (err: unknown) {
       this.isDurable = false;
       safeLogger.warn(
@@ -47,42 +52,82 @@ export class CreditLedgerService {
   }
 
   /**
-   * Loads existing transactions from the append-only journal file on disk.
+   * One-time migration: reads legacy credit_ledger.jsonl, records into SQLite, and unlinks the file.
    */
-  private loadJournal() {
-    if (!this.journalPath || !fs.existsSync(this.journalPath)) return;
-
+  private migrateLegacyJournalIfPresent(legacyJournalPath: string) {
+    if (!fs.existsSync(legacyJournalPath)) return;
     try {
-      const fileData = fs.readFileSync(this.journalPath, 'utf8');
+      const fileData = fs.readFileSync(legacyJournalPath, 'utf8');
       const lines = fileData.split('\n');
+      let migratedCount = 0;
 
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed) continue;
         try {
           const tx: CreditTransaction = JSON.parse(trimmed);
-          this.applyTransactionToMemory(tx);
+          defaultDb.recordTransaction({
+            id: tx.id,
+            userId: tx.userId,
+            type: tx.type,
+            amount: tx.amount,
+            balanceAfter: tx.balanceAfter,
+            reason: tx.reason,
+            idempotencyKey: tx.idempotencyKey,
+            metadata: tx.metadata,
+            createdAt: tx.timestamp,
+          });
+          migratedCount++;
         } catch {
-          // Ignore malformed line
+          // ignore malformed line
         }
       }
+
+      // Unlink legacy file after migration
+      fs.unlinkSync(legacyJournalPath);
+      safeLogger.info(`Successfully migrated ${migratedCount} legacy transactions from credit_ledger.jsonl into SQLite and removed JSONL file.`);
     } catch (err: unknown) {
-      safeLogger.error(`Error loading credit ledger journal: ${(err as Error)?.message}`);
+      safeLogger.warn(`Legacy journal migration notice: ${(err as Error)?.message}`);
     }
   }
 
   /**
-   * Appends a transaction to the on-disk journal atomically.
+   * Loads existing transactions directly from the SQLite database.
+   */
+  private loadFromSQLite() {
+    try {
+      const rows = defaultDb.getAllTransactions();
+      for (const row of rows) {
+        let metadata: Record<string, unknown> | undefined = undefined;
+        if (row.metadata_json) {
+          try {
+            metadata = JSON.parse(row.metadata_json);
+          } catch {
+            // ignore
+          }
+        }
+        const tx: CreditTransaction = {
+          id: row.id,
+          userId: row.user_id,
+          timestamp: row.created_at,
+          type: row.type as CreditTransactionType,
+          amount: row.amount,
+          balanceAfter: row.balance_after,
+          reason: row.reason,
+          idempotencyKey: row.idempotency_key || undefined,
+          metadata,
+        };
+        this.applyTransactionToMemory(tx);
+      }
+    } catch (err: unknown) {
+      safeLogger.error(`Error loading credit ledger transactions from SQLite: ${(err as Error)?.message}`);
+    }
+  }
+
+  /**
+   * Records a transaction directly into SQLite for ACID durability.
    */
   private appendToJournal(tx: CreditTransaction) {
-    if (this.journalPath) {
-      try {
-        fs.appendFileSync(this.journalPath, JSON.stringify(tx) + '\n', 'utf8');
-      } catch (err: unknown) {
-        safeLogger.error(`Failed to write transaction to journal: ${(err as Error)?.message}`);
-      }
-    }
-    // Also record synchronously into SQLite for ACID persistence
     try {
       defaultDb.recordTransaction({
         id: tx.id,
@@ -96,7 +141,7 @@ export class CreditLedgerService {
         createdAt: tx.timestamp,
       });
     } catch (dbErr: unknown) {
-      safeLogger.warn(`SQLite transaction sync notice: ${(dbErr as Error)?.message}`);
+      safeLogger.warn(`SQLite transaction persistence notice: ${(dbErr as Error)?.message}`);
     }
   }
 
@@ -496,7 +541,7 @@ export class CreditLedgerService {
   }
 
   /**
-   * Resets ledger in memory and deletes test journal (for test suite cleanup).
+   * Resets ledger in memory and in SQLite (for test suite cleanup).
    */
   reset(): void {
     this.transactions.clear();
@@ -505,6 +550,12 @@ export class CreditLedgerService {
     this.redeemedOrders.clear();
     this.activeReservations.clear();
     this.userMutexes.clear();
+
+    try {
+      defaultDb.clearAllTransactions();
+    } catch {
+      // ignore
+    }
 
     if (this.journalPath && fs.existsSync(this.journalPath)) {
       try {
@@ -515,9 +566,11 @@ export class CreditLedgerService {
     }
   }
 
-  get durabilityStatus(): { isDurable: boolean; journalPath: string | null } {
+  get durabilityStatus(): { isDurable: boolean; storage: string; databasePath: string; journalPath: string | null } {
     return {
       isDurable: this.isDurable,
+      storage: 'sqlite',
+      databasePath: defaultDb.getDatabasePath(),
       journalPath: this.journalPath,
     };
   }
