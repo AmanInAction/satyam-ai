@@ -15,9 +15,9 @@ export async function OPTIONS() {
 }
 
 export async function GET(req: NextRequest) {
-  const sessionInfo = getUserIdFromRequest(req);
+  const sessionInfo = await getUserIdFromRequest(req);
   const balanceInfo = await defaultCreditLedger.getBalance(sessionInfo.userId);
-  const recentAnalyses = defaultDb.getAnalysesByUser(sessionInfo.userId, 5);
+  const recentAnalyses = await defaultDb.getAnalysesByUser(sessionInfo.userId, 5);
 
   const response = NextResponse.json({
     userId: sessionInfo.userId,

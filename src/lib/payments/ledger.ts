@@ -8,7 +8,9 @@ import {
 } from './types';
 import { FREE_INITIAL_CREDITS } from './config';
 import { safeLogger } from '../security/logger';
-import { defaultDb } from '../db/database';
+import { AppDatabase, defaultDb } from '../db/database';
+import { DbTransaction } from '../db/schema';
+import { TursoDatabase } from '../db/tursoDatabase';
 
 export class CreditLedgerService {
   private transactions: Map<string, CreditTransaction[]> = new Map(); // userId -> transactions
@@ -20,122 +22,120 @@ export class CreditLedgerService {
   private userMutexes: Map<string, Promise<unknown>> = new Map(); // serialization lock per user
   private journalPath: string | null = null;
   private isDurable: boolean = false;
+  private initialization: Promise<void> | null = null;
+  private storageDir: string;
 
   constructor(storageDir?: string) {
-    if (storageDir) {
-      this.initStorage(storageDir);
-    } else {
-      const dataDir = process.env.DATA_DIR || path.join(process.cwd(), '.data');
-      this.initStorage(dataDir);
-    }
+    this.storageDir = storageDir || process.env.DATA_DIR || path.join(process.cwd(), '.data');
   }
 
-  private initStorage(dataDir: string) {
-    try {
+  private ensureInitialized(): Promise<void> {
+    if (!this.initialization) {
+      this.initialization = this.initStorage().catch((error: unknown) => {
+        this.initialization = null;
+        this.isDurable = false;
+        throw error;
+      });
+    }
+    return this.initialization;
+  }
+
+  private async initStorage(): Promise<void> {
+    if (defaultDb instanceof AppDatabase && !(defaultDb instanceof TursoDatabase)) {
+      const dataDir = this.storageDir;
       if (!fs.existsSync(dataDir)) {
         fs.mkdirSync(dataDir, { recursive: true });
       }
 
-      // 1. One-time legacy migration: if credit_ledger.jsonl exists, migrate all rows to SQLite
       const legacyJournalPath = path.join(dataDir, 'credit_ledger.jsonl');
-      this.migrateLegacyJournalIfPresent(legacyJournalPath);
-
-      // 2. Load all historical transactions from SQLite
-      this.loadFromSQLite();
-      this.isDurable = true;
-      safeLogger.info(`Credit ledger initialized with durable SQLite storage at: ${defaultDb.getDatabasePath()}`);
-    } catch (err: unknown) {
-      this.isDurable = false;
-      safeLogger.warn(
-        `Failed to initialize durable storage for credit ledger (${(err as Error)?.message}). Operating with in-memory persistence.`
-      );
+      await this.migrateLegacyJournalIfPresent(legacyJournalPath);
     }
+
+    await this.loadFromSQLite();
+    this.isDurable = true;
+    safeLogger.info(`Credit ledger initialized with durable storage at: ${defaultDb.getDatabasePath()}`);
   }
 
   /**
-   * One-time migration: reads legacy credit_ledger.jsonl, records into SQLite, and unlinks the file.
+   * One-time migration: reads legacy credit_ledger.jsonl, records it in the database, and unlinks the file.
    */
-  private migrateLegacyJournalIfPresent(legacyJournalPath: string) {
+  private async migrateLegacyJournalIfPresent(legacyJournalPath: string): Promise<void> {
     if (!fs.existsSync(legacyJournalPath)) return;
-    try {
-      const fileData = fs.readFileSync(legacyJournalPath, 'utf8');
-      const lines = fileData.split('\n');
-      let migratedCount = 0;
+    const fileData = fs.readFileSync(legacyJournalPath, 'utf8');
+    const lines = fileData.split('\n');
+    let migratedCount = 0;
+    const transactions: CreditTransaction[] = [];
 
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        try {
-          const tx: CreditTransaction = JSON.parse(trimmed);
-          defaultDb.recordTransaction({
-            id: tx.id,
-            userId: tx.userId,
-            type: tx.type,
-            amount: tx.amount,
-            balanceAfter: tx.balanceAfter,
-            reason: tx.reason,
-            idempotencyKey: tx.idempotencyKey,
-            metadata: tx.metadata,
-            createdAt: tx.timestamp,
-          });
-          migratedCount++;
-        } catch {
-          // ignore malformed line
-        }
+    for (const [index, line] of lines.entries()) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        transactions.push(JSON.parse(trimmed) as CreditTransaction);
+      } catch (error) {
+        throw new Error(`Invalid legacy credit journal entry on line ${index + 1}.`, {
+          cause: error,
+        });
       }
-
-      // Unlink legacy file after migration
-      fs.unlinkSync(legacyJournalPath);
-      safeLogger.info(`Successfully migrated ${migratedCount} legacy transactions from credit_ledger.jsonl into SQLite and removed JSONL file.`);
-    } catch (err: unknown) {
-      safeLogger.warn(`Legacy journal migration notice: ${(err as Error)?.message}`);
     }
+
+    for (const tx of transactions) {
+      await defaultDb.recordTransaction({
+        id: tx.id,
+        userId: tx.userId,
+        type: tx.type,
+        amount: tx.amount,
+        balanceAfter: tx.balanceAfter,
+        reason: tx.reason,
+        idempotencyKey: tx.idempotencyKey,
+        metadata: tx.metadata,
+        createdAt: tx.timestamp,
+      });
+      migratedCount++;
+    }
+    fs.unlinkSync(legacyJournalPath);
+    safeLogger.info(`Successfully migrated ${migratedCount} legacy transactions from credit_ledger.jsonl into the database and removed JSONL file.`);
   }
 
   /**
    * Loads existing transactions directly from the SQLite database.
    */
-  private loadFromSQLite() {
-    try {
-      const rows = defaultDb.getAllTransactions();
-      for (const row of rows) {
-        let metadata: Record<string, unknown> | undefined = undefined;
-        if (row.metadata_json) {
-          try {
-            metadata = JSON.parse(row.metadata_json);
-          } catch {
-            // ignore
-          }
-        }
-        const tx: CreditTransaction = {
-          id: row.id,
-          userId: row.user_id,
-          timestamp: row.created_at,
-          type: row.type as CreditTransactionType,
-          amount: row.amount,
-          balanceAfter: row.balance_after,
-          reason: row.reason,
-          idempotencyKey: row.idempotency_key || undefined,
-          metadata,
-        };
-        this.applyTransactionToMemory(tx);
-      }
-      for (const state of defaultDb.getAllUserCreditStates()) {
-        this.balances.set(state.user_id, state.credits_available);
-        if (state.has_received_free_grant) {
-          this.freeGrantUsers.add(state.user_id);
+  private async loadFromSQLite(): Promise<void> {
+    const rows = await defaultDb.getAllTransactions();
+    for (const row of rows) {
+      let metadata: Record<string, unknown> | undefined = undefined;
+      if (row.metadata_json) {
+        try {
+          metadata = JSON.parse(row.metadata_json);
+        } catch {
+          // ignore malformed historical metadata
         }
       }
-    } catch (err: unknown) {
-      safeLogger.error(`Error loading credit ledger transactions from SQLite: ${(err as Error)?.message}`);
+      const tx: CreditTransaction = {
+        id: row.id,
+        userId: row.user_id,
+        timestamp: row.created_at,
+        type: row.type as CreditTransactionType,
+        amount: row.amount,
+        balanceAfter: row.balance_after,
+        reason: row.reason,
+        idempotencyKey: row.idempotency_key || undefined,
+        metadata,
+      };
+      this.applyTransactionToMemory(tx);
+    }
+    for (const state of await defaultDb.getAllUserCreditStates()) {
+      this.balances.set(state.user_id, state.credits_available);
+      if (state.has_received_free_grant) {
+        this.freeGrantUsers.add(state.user_id);
+      }
     }
   }
 
   /**
-   * Records a transaction directly into SQLite for ACID durability.
+   * Records a transaction in the configured database for ACID durability.
    */
-  private appendToJournal(tx: CreditTransaction) {
-    defaultDb.recordTransaction({
+  private async appendToJournal(tx: CreditTransaction): Promise<DbTransaction> {
+    return await defaultDb.recordTransaction({
       id: tx.id,
       userId: tx.userId,
       type: tx.type,
@@ -170,6 +170,7 @@ export class CreditLedgerService {
    * Runs an operation with strict per-user mutex serialization to prevent concurrent race conditions.
    */
   private async withUserLock<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+    await this.ensureInitialized();
     const prev = this.userMutexes.get(userId) || Promise.resolve();
     let resolveLock!: () => void;
     const current = new Promise<void>((resolve) => {
@@ -191,41 +192,40 @@ export class CreditLedgerService {
   /**
    * Synchronously initializes free credits for a user if not already initialized (internal helper).
    */
-  private initUserSync(userId: string): void {
-    if (!this.freeGrantUsers.has(userId)) {
-      if (this.migratedAnonymousUsers.has(userId) || defaultDb.hasAnonymousCreditMigration(userId)) {
-        this.migratedAnonymousUsers.add(userId);
-        return;
+  private async initUser(userId: string): Promise<void> {
+    const persistedState = await defaultDb.getUserCreditState(userId);
+    if (persistedState) {
+      this.balances.set(userId, persistedState.credits_available);
+      if (persistedState.has_received_free_grant) {
+        this.freeGrantUsers.add(userId);
       }
-
-      const persistedState = defaultDb.getUserCreditState(userId);
-      if (persistedState) {
-        this.balances.set(userId, persistedState.credits_available);
-        if (persistedState.has_received_free_grant) {
-          this.freeGrantUsers.add(userId);
-          return;
-        }
-      }
-
-      const currentBalance = this.balances.get(userId) || 0;
-      const newBalance = currentBalance + FREE_INITIAL_CREDITS;
-
-      const tx: CreditTransaction = {
-        id: `tx_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
-        userId,
-        timestamp: new Date().toISOString(),
-        type: 'initial_grant',
-        amount: FREE_INITIAL_CREDITS,
-        balanceAfter: newBalance,
-        reason: `Freemium Welcome Bonus (${FREE_INITIAL_CREDITS} Free Analysis Credits)`,
-        idempotencyKey: `free_grant_${userId}`,
-      };
-
-      this.appendToJournal(tx);
-      this.applyTransactionToMemory(tx);
-
-      safeLogger.info(`Granted ${FREE_INITIAL_CREDITS} free credits to user ${userId}`);
     }
+    if (this.freeGrantUsers.has(userId)) return;
+    if (this.migratedAnonymousUsers.has(userId) ||
+        await defaultDb.hasAnonymousCreditMigration(userId)) {
+      this.migratedAnonymousUsers.add(userId);
+      return;
+    }
+
+    const currentBalance = this.balances.get(userId) || 0;
+    const newBalance = currentBalance + FREE_INITIAL_CREDITS;
+
+    const tx: CreditTransaction = {
+      id: `tx_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+      userId,
+      timestamp: new Date().toISOString(),
+      type: 'initial_grant',
+      amount: FREE_INITIAL_CREDITS,
+      balanceAfter: newBalance,
+      reason: `Freemium Welcome Bonus (${FREE_INITIAL_CREDITS} Free Analysis Credits)`,
+      idempotencyKey: `free_grant_${userId}`,
+    };
+
+    const persisted = await this.appendToJournal(tx);
+    tx.balanceAfter = persisted.balance_after;
+    this.applyTransactionToMemory(tx);
+
+    safeLogger.info(`Granted ${FREE_INITIAL_CREDITS} free credits to user ${userId}`);
   }
 
   /**
@@ -233,7 +233,7 @@ export class CreditLedgerService {
    */
   async getOrCreateUser(userId: string): Promise<CreditBalanceResponse> {
     return this.withUserLock(userId, async () => {
-      this.initUserSync(userId);
+      await this.initUser(userId);
       return this.computeBalanceResponse(userId);
     });
   }
@@ -243,7 +243,7 @@ export class CreditLedgerService {
    */
   async getBalance(userId: string): Promise<CreditBalanceResponse> {
     return this.withUserLock(userId, async () => {
-      this.initUserSync(userId);
+      await this.initUser(userId);
       return this.computeBalanceResponse(userId);
     });
   }
@@ -289,7 +289,7 @@ export class CreditLedgerService {
     analysisType: 'text' | 'url' | 'image'
   ): Promise<CreditReservation> {
     return this.withUserLock(userId, async () => {
-      this.initUserSync(userId);
+      await this.initUser(userId);
 
       const balanceInfo = this.computeBalanceResponse(userId);
       if (balanceInfo.available < amount) {
@@ -336,6 +336,7 @@ export class CreditLedgerService {
     }
 
     return this.withUserLock(reservation.userId, async () => {
+      await this.initUser(reservation.userId);
       const currentBalance = this.balances.get(reservation.userId) || 0;
       const newBalance = Math.max(0, currentBalance - reservation.amount);
 
@@ -355,13 +356,21 @@ export class CreditLedgerService {
         },
       };
 
-      this.appendToJournal(tx);
+      const persisted = await this.appendToJournal(tx);
+      if (persisted.id !== tx.id) {
+        reservation.status = 'committed';
+        this.activeReservations.delete(reservationId);
+        const state = await defaultDb.getUserCreditState(reservation.userId);
+        if (state) this.balances.set(reservation.userId, state.credits_available);
+        return this.toCreditTransaction(persisted);
+      }
+      tx.balanceAfter = persisted.balance_after;
       reservation.status = 'committed';
       this.activeReservations.delete(reservationId);
       this.applyTransactionToMemory(tx);
 
       safeLogger.info(
-        `Committed debit of ${reservation.amount} credits for user ${reservation.userId}. New balance: ${newBalance}`
+        `Committed debit of ${reservation.amount} credits for user ${reservation.userId}. New balance: ${tx.balanceAfter}`
       );
       return tx;
     });
@@ -414,7 +423,7 @@ export class CreditLedgerService {
       }
 
       // Ensure user initialized
-      this.initUserSync(userId);
+      await this.initUser(userId);
 
       const currentBalance = this.balances.get(userId) || 0;
       const newBalance = currentBalance + credits;
@@ -437,11 +446,18 @@ export class CreditLedgerService {
         },
       };
 
-      this.appendToJournal(tx);
+      const persisted = await this.appendToJournal(tx);
+      if (persisted.id !== tx.id) {
+        return {
+          transaction: this.toCreditTransaction(persisted),
+          alreadyRedeemed: true,
+        };
+      }
+      tx.balanceAfter = persisted.balance_after;
       this.applyTransactionToMemory(tx);
 
       safeLogger.info(
-        `Credited ${credits} purchased credits to user ${userId} for PayPal order ${orderId}. New balance: ${newBalance}`
+        `Credited ${credits} purchased credits to user ${userId} for PayPal order ${orderId}. New balance: ${tx.balanceAfter}`
       );
 
       return {
@@ -461,6 +477,7 @@ export class CreditLedgerService {
     creditsToDeduct: number
   ): Promise<CreditTransaction | null> {
     return this.withUserLock(userId, async () => {
+      await this.initUser(userId);
       // Check if refund already processed
       const existingRefund = (this.transactions.get(userId) || []).find(
         (t) => t.metadata?.refundId === refundId
@@ -488,11 +505,13 @@ export class CreditLedgerService {
         },
       };
 
-      this.appendToJournal(tx);
+      const persisted = await this.appendToJournal(tx);
+      if (persisted.id !== tx.id) return this.toCreditTransaction(persisted);
+      tx.balanceAfter = persisted.balance_after;
       this.applyTransactionToMemory(tx);
 
       safeLogger.info(
-        `Processed refund reversal of ${actualDeduction} credits for user ${userId}. New balance: ${newBalance}`
+        `Processed refund reversal of ${actualDeduction} credits for user ${userId}. New balance: ${tx.balanceAfter}`
       );
       return tx;
     });
@@ -503,8 +522,31 @@ export class CreditLedgerService {
    */
   async getTransactions(userId: string): Promise<CreditTransaction[]> {
     return this.withUserLock(userId, async () => {
-      return [...(this.transactions.get(userId) || [])].reverse();
+      const rows = await defaultDb.getTransactionsByUser(userId, 50);
+      return rows.map((row) => this.toCreditTransaction(row));
     });
+  }
+
+  private toCreditTransaction(row: DbTransaction): CreditTransaction {
+    let metadata: Record<string, unknown> | undefined;
+    if (row.metadata_json) {
+      try {
+        metadata = JSON.parse(row.metadata_json);
+      } catch {
+        // Ignore malformed historical metadata.
+      }
+    }
+    return {
+      id: row.id,
+      userId: row.user_id,
+      timestamp: row.created_at,
+      type: row.type as CreditTransactionType,
+      amount: row.amount,
+      balanceAfter: row.balance_after,
+      reason: row.reason,
+      idempotencyKey: row.idempotency_key || undefined,
+      metadata,
+    };
   }
 
   /**
@@ -517,12 +559,13 @@ export class CreditLedgerService {
 
     return this.withUserLock(toUserId, async () => {
       return this.withUserLock(fromUserId, async () => {
+        await this.initUser(fromUserId);
         const fromBalance = this.balances.get(fromUserId) || 0;
         const alreadyMigrated = this.migratedAnonymousUsers.has(fromUserId) ||
-          defaultDb.hasAnonymousCreditMigration(fromUserId);
+          await defaultDb.hasAnonymousCreditMigration(fromUserId);
 
         if (fromBalance > 0 && !alreadyMigrated) {
-          const targetState = defaultDb.getUserCreditState(toUserId);
+          const targetState = await defaultDb.getUserCreditState(toUserId);
           const targetHasReceivedFreeGrant = this.freeGrantUsers.has(toUserId) ||
             Boolean(targetState?.has_received_free_grant);
           const transactions: CreditTransaction[] = [];
@@ -555,24 +598,18 @@ export class CreditLedgerService {
             });
           }
 
-          const migrated = defaultDb.recordAnonymousCreditMigration(
+          const migrated = await defaultDb.recordAnonymousCreditMigration(
             fromUserId,
             toUserId,
             transactions
           );
           if (migrated) {
             this.migratedAnonymousUsers.add(fromUserId);
-            for (const tx of transactions) {
-              this.applyTransactionToMemory(tx);
-            }
-          }
+            for (const tx of transactions) this.applyTransactionToMemory(tx);
+        }
         }
 
-        try {
-          defaultDb.migrateAnonymousData(fromUserId, toUserId);
-        } catch {
-          // ignore
-        }
+        await defaultDb.migrateAnonymousData(fromUserId, toUserId);
 
         const fromTransactions = this.transactions.get(fromUserId) || [];
         if (fromTransactions.length > 0) {
@@ -589,7 +626,7 @@ export class CreditLedgerService {
   /**
    * Resets ledger in memory and in SQLite (for test suite cleanup).
    */
-  reset(): void {
+  async reset(): Promise<void> {
     this.transactions.clear();
     this.balances.clear();
     this.freeGrantUsers.clear();
@@ -598,25 +635,22 @@ export class CreditLedgerService {
     this.activeReservations.clear();
     this.userMutexes.clear();
 
-    try {
-      defaultDb.clearAllTransactions();
-    } catch {
-      // ignore
-    }
+    await defaultDb.clearAllTransactions();
 
     if (this.journalPath && fs.existsSync(this.journalPath)) {
-      try {
-        fs.unlinkSync(this.journalPath);
-      } catch {
-        // ignore
-      }
+      fs.unlinkSync(this.journalPath);
     }
   }
 
-  get durabilityStatus(): { isDurable: boolean; storage: string; databasePath: string; journalPath: string | null } {
+  get durabilityStatus(): {
+    isDurable: boolean;
+    storage: 'sqlite' | 'turso';
+    databasePath: string;
+    journalPath: string | null;
+  } {
     return {
       isDurable: this.isDurable,
-      storage: 'sqlite',
+      storage: defaultDb instanceof TursoDatabase ? 'turso' : 'sqlite',
       databasePath: defaultDb.getDatabasePath(),
       journalPath: this.journalPath,
     };

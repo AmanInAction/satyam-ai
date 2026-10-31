@@ -6,6 +6,7 @@ import { defaultRateLimiter } from '@/src/lib/security/rateLimiter';
 import { checkAndReserveCredits, finalizeCreditUsage, CreditGuardResult } from '@/src/lib/payments/creditGuard';
 import { attachUserSessionHeaders } from '@/src/lib/payments/userSession';
 import { defaultDb } from '@/src/lib/db/database';
+import { safeLogger } from '@/src/lib/security/logger';
 
 export async function OPTIONS() {
   return new NextResponse(null, {
@@ -157,7 +158,7 @@ export async function POST(req: NextRequest) {
     // Save to SQLite database for persistent user history
     try {
       const extractedSummary = analysis.extracted_text?.slice(0, 200) || 'Screenshot / Image scan';
-      defaultDb.saveAnalysis({
+      await defaultDb.saveAnalysis({
         id: analysis.analysis_id,
         userId: creditGuardResult.sessionInfo.userId,
         inputType: 'image',
@@ -171,8 +172,11 @@ export async function POST(req: NextRequest) {
           'Screenshot OCR and threat analysis completed',
         fullResult: analysis,
       });
-    } catch {
-      // Non-blocking best-effort history save
+    } catch (error) {
+      safeLogger.error('Failed to persist image analysis history.', {
+        analysisId: analysis.analysis_id,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
 
     const response = NextResponse.json({

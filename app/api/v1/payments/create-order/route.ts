@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     return rateLimitCheck.response;
   }
 
-  const sessionInfo = getUserIdFromRequest(req);
+  const sessionInfo = await getUserIdFromRequest(req);
 
   let body: unknown;
   try {

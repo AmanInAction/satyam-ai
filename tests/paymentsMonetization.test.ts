@@ -17,15 +17,15 @@ describe('Phase 9: PayPal Sandbox & Credit Monetization Engine', () => {
   const testDataDir = path.join(process.cwd(), '.data-test');
   let testLedger: CreditLedgerService;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testLedger = new CreditLedgerService(testDataDir);
-    testLedger.reset();
-    defaultCreditLedger.reset();
+    await testLedger.reset();
+    await defaultCreditLedger.reset();
   });
 
-  afterEach(() => {
-    testLedger.reset();
-    defaultCreditLedger.reset();
+  afterEach(async () => {
+    await testLedger.reset();
+    await defaultCreditLedger.reset();
     if (fs.existsSync(testDataDir)) {
       try {
         fs.rmSync(testDataDir, { recursive: true, force: true });

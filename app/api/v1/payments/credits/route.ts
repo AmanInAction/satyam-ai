@@ -17,7 +17,7 @@ export async function OPTIONS() {
 
 export async function GET(req: NextRequest) {
   const requestId = generateRequestId();
-  const sessionInfo = getUserIdFromRequest(req);
+  const sessionInfo = await getUserIdFromRequest(req);
 
   try {
     // Idempotently get or initialize user with 3 free credits

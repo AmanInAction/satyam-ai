@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const user = defaultDb.findUserByEmail(email);
+    const user = await defaultDb.findUserByEmail(email);
     if (!user) {
       return createErrorResponse(
         401,
@@ -65,12 +65,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Migrate anonymous credits if any
-    const priorSession = getUserIdFromRequest(req);
+    const priorSession = await getUserIdFromRequest(req);
     if (priorSession.userId && priorSession.userId !== user.id && !priorSession.isAuthenticated) {
       await defaultCreditLedger.migrateUser(priorSession.userId, user.id);
     }
 
-    const session = defaultDb.createSession(user.id);
+    const session = await defaultDb.createSession(user.id);
     const balanceInfo = await defaultCreditLedger.getBalance(user.id);
 
     const response = NextResponse.json({

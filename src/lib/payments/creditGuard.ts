@@ -14,7 +14,7 @@ export async function checkAndReserveCredits(
   req: NextRequest,
   analysisType: 'text' | 'url' | 'image'
 ): Promise<CreditGuardResult> {
-  const sessionInfo = getUserIdFromRequest(req);
+  const sessionInfo = await getUserIdFromRequest(req);
   const cost = CREDIT_COSTS[analysisType];
 
   const reservation = await defaultCreditLedger.reserveCredits(

@@ -3,8 +3,8 @@
 [![Next.js 15](https://img.shields.io/badge/Next.js-15%2B-black?style=flat&logo=next.js)](https://nextjs.org/)
 [![TypeScript 5.7](https://img.shields.io/badge/TypeScript-5.7-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
 [![Tailwind CSS v4](https://img.shields.io/badge/Tailwind-v4-38bdf8?style=flat&logo=tailwindcss)](https://tailwindcss.com/)
-[![SQLite](https://img.shields.io/badge/SQLite-Node_22_Native-003B57?style=flat&logo=sqlite)](https://nodejs.org/api/sqlite.html)
-[![Vitest](https://img.shields.io/badge/Tests-218_Passed-success?style=flat&logo=vitest)](https://vitest.dev/)
+[![Database](https://img.shields.io/badge/Database-SQLite%20%7C%20Turso-003B57?style=flat&logo=sqlite)](https://turso.tech/)
+[![Vitest](https://img.shields.io/badge/Tests-229_Passed-success?style=flat&logo=vitest)](https://vitest.dev/)
 [![National Cyber Helpline](https://img.shields.io/badge/Helpline-1930-red?style=flat)](https://cybercrime.gov.in)
 
 > **SatyamAI** (सत्यम् AI) is a production-grade, India-aware decision-support platform designed to protect citizens from deceptive messages, phishing links, viral claims, and extortion traps. It uniquely separates **Scam/Fraud Risk** from **Factual Claim Verification**, backed by deterministic heuristic rules, live source citations, and contextual AI reasoning.
@@ -43,7 +43,7 @@ graph TD
     end
 
     subgraph DataPersistence ["Persistence & Storage Layer (ACID)"]
-        SQLiteDB["Node 22 Native SQLite (WAL Mode)<br/>- users (salted scrypt)<br/>- sessions (token auth)<br/>- analyses (scan history)<br/>- transactions (audit ledger)"]
+        SQLiteDB["Local: Node SQLite (WAL)<br/>Production: Turso/libSQL<br/>- users & sessions<br/>- analyses<br/>- credit balances & transactions"]
         
     end
 
@@ -78,7 +78,7 @@ sequenceDiagram
     participant Rules as Deterministic Rules
     participant LLM as Amazon Bedrock / Gemini
     participant Evidence as Fact Check Tools
-    participant DB as SQLite DB & Journal
+    participant DB as SQLite / Turso Database
 
     User->>UI: Submits message, URL, or screenshot
     UI->>API: POST /api/v1/analyze/text (with Cookie/Header)
@@ -186,14 +186,14 @@ Traditional AI chatbots collapse complex information into a single generic label
 * **Multilingual:** Handles English, Hindi (Devanagari), and Hinglish (colloquial Roman script).
 * **Helpline Routing:** Directly displays the **National Cyber Crime Helpline: 1930** and **cybercrime.gov.in**.
 
-### 3. Native Zero-Dependency SQLite Engine
-* Uses Node 22 native `node:sqlite` (`DatabaseSync`) in **WAL mode**.
-* Zero external native compilation dependencies (no `node-gyp` or C++ build tools required).
+### 3. Environment-Specific Persistent Database
+* Local development uses Node's native `node:sqlite` (`DatabaseSync`) in **WAL mode**.
+* Vercel production uses the remote Turso/libSQL serverless client; it never relies on the deployment filesystem for durable data.
 * Persistent storage for:
   - Users with salted `scrypt` password hashing.
   - Session tokens with 30-day expiry.
   - Saved scan history with search and privacy deletion.
-  - Financial transaction audit ledger.
+  - Credit balances and financial transaction audit ledger.
 
 ### 4. Two-Phase Credit Guard & Monetization
 * **3 Free Checks** for every guest on first visit.
@@ -210,7 +210,7 @@ Traditional AI chatbots collapse complex information into a single generic label
 | **Framework** | Next.js 15+ (App Router) | High-performance server components and API route handlers |
 | **Language** | TypeScript 5.7 | End-to-end type safety |
 | **Styling** | Tailwind CSS v4 | High-contrast light theme, accessible ARIA roles, responsive UI |
-| **Database** | Node 22 Native SQLite (`node:sqlite`) | ACID transactional storage in WAL mode |
+| **Database** | SQLite locally; Turso/libSQL on Vercel | Persistent transactional user, scan, and credit data |
 | **Validation** | Zod 3.24 | Strict runtime schema parsing on all requests and responses |
 | **AI Inference** | Amazon Bedrock & Gemini API Adapter | Server-side LLM inference with structured JSON output |
 | **Evidence Retrieval** | Google Fact Check Tools API | Attributable citations with publisher and canonical URL |
@@ -244,7 +244,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ### Running Tests & Quality Checks
 ```bash
-# Run all 218 automated Vitest tests across 19 suites
+# Run all 229 automated Vitest tests across 20 suites
 npm run test
 
 # Run TypeScript type validation (0 errors)
@@ -256,6 +256,24 @@ npm run build
 
 ---
 
+## Production Database Setup (Vercel)
+
+Vercel instances must use a remote Turso/libSQL database; the local SQLite file is only for development. Configure `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` in the deployment environment. If either is missing, production database operations fail explicitly instead of falling back to ephemeral storage.
+
+Apply the schema before deploying:
+
+```powershell
+npm run db:migrate:turso
+```
+
+To migrate existing local data, stop the local app, make a protected copy of `.data/satyam.sqlite` and any matching `-wal`/`-shm` files, then import that copy:
+
+```powershell
+npm run db:import:turso -- --source "C:\path\to\backup\satyam.sqlite"
+```
+
+The importer preserves user credentials, sessions, scan history, credit balances and transactions, guest migration records, and Telegram links. It is additive: identical existing rows are skipped, conflicting rows abort the transaction, and no remote records are overwritten. Review the per-table counts before deployment. Do not run imports against the live database without a backup and an agreed maintenance window.
+
 ## 📡 API Endpoints Summary
 
 ### Core Analysis
@@ -264,7 +282,7 @@ npm run build
 * `POST /api/v1/analyze/image`: Extracts and analyzes screenshot text (Cost: 2 checks).
 * `GET /api/v1/health`: System health and provider availability diagnostics.
 
-### Authentication & User Accounts (SQLite)
+### Authentication & User Accounts (SQLite locally, Turso in production)
 * `POST /api/v1/auth/register`: Creates an account, hashes password with salted scrypt, and migrates guest credits/scans.
 * `POST /api/v1/auth/login`: Verifies credentials and issues a secure session token.
 * `GET /api/v1/auth/me`: Retrieves current authenticated profile and check balance.

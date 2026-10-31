@@ -16,7 +16,7 @@ export async function OPTIONS() {
 
 export async function GET(req: NextRequest) {
   const requestId = generateRequestId();
-  const sessionInfo = getUserIdFromRequest(req);
+  const sessionInfo = await getUserIdFromRequest(req);
 
   try {
     const url = new URL(req.url);
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
 
     // Single item detail lookup
     if (detailId) {
-      const item = defaultDb.getAnalysisById(detailId, sessionInfo.userId);
+      const item = await defaultDb.getAnalysisById(detailId, sessionInfo.userId);
       if (!item) {
         return createErrorResponse(404, 'NOT_FOUND', 'Analysis record not found.', requestId);
       }
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
     }
 
     // List lookup
-    const analyses = defaultDb.getAnalysesByUser(sessionInfo.userId, limit, offset, search);
+    const analyses = await defaultDb.getAnalysesByUser(sessionInfo.userId, limit, offset, search);
 
     const summaries = analyses.map((a) => {
       let parsed: any = null;
@@ -85,19 +85,19 @@ export async function GET(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   const requestId = generateRequestId();
-  const sessionInfo = getUserIdFromRequest(req);
+  const sessionInfo = await getUserIdFromRequest(req);
 
   try {
     const url = new URL(req.url);
     const analysisId = url.searchParams.get('id');
 
     if (analysisId) {
-      defaultDb.deleteAnalysis(analysisId, sessionInfo.userId);
+      await defaultDb.deleteAnalysis(analysisId, sessionInfo.userId);
       return NextResponse.json({ success: true, message: `Deleted analysis ${analysisId}` });
     }
 
     // Clear all analyses for current user
-    defaultDb.clearAnalyses(sessionInfo.userId);
+    await defaultDb.clearAnalyses(sessionInfo.userId);
     return NextResponse.json({ success: true, message: 'All analysis history cleared successfully.' });
   } catch {
     return createErrorResponse(500, 'DELETE_FAILED', 'Unable to delete analysis history.', requestId);

@@ -19,7 +19,7 @@ export interface UserSessionInfo {
   sessionToken?: string;
 }
 
-export function getUserIdFromRequest(req: NextRequest): UserSessionInfo {
+export async function getUserIdFromRequest(req: NextRequest): Promise<UserSessionInfo> {
   // 1. Check for authenticated session token (via cookie or Authorization header)
   let sessionToken = req.cookies.get(SESSION_COOKIE_NAME)?.value;
   if (!sessionToken) {
@@ -30,20 +30,16 @@ export function getUserIdFromRequest(req: NextRequest): UserSessionInfo {
   }
 
   if (sessionToken) {
-    try {
-      const session = defaultDb.getSession(sessionToken);
-      if (session) {
-        return {
-          userId: session.user_id,
-          isNewUser: false,
-          isAuthenticated: true,
-          userEmail: session.user.email,
-          displayName: session.user.display_name,
-          sessionToken,
-        };
-      }
-    } catch {
-      // If DB error, fall back to anonymous identifiers
+    const session = await defaultDb.getSession(sessionToken);
+    if (session) {
+      return {
+        userId: session.user_id,
+        isNewUser: false,
+        isAuthenticated: true,
+        userEmail: session.user.email,
+        displayName: session.user.display_name,
+        sessionToken,
+      };
     }
   }
 

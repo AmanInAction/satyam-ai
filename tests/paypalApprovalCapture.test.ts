@@ -12,16 +12,16 @@ describe('PayPal Sandbox Approval and Capture Lifecycle', () => {
   const testDataDir = path.join(process.cwd(), '.data-test-paypal');
   let testLedger: CreditLedgerService;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testLedger = new CreditLedgerService(testDataDir);
-    testLedger.reset();
-    defaultCreditLedger.reset();
+    await testLedger.reset();
+    await defaultCreditLedger.reset();
     defaultPayPalClient.resetSimulatedOrders();
   });
 
-  afterEach(() => {
-    testLedger.reset();
-    defaultCreditLedger.reset();
+  afterEach(async () => {
+    await testLedger.reset();
+    await defaultCreditLedger.reset();
     defaultPayPalClient.resetSimulatedOrders();
     if (fs.existsSync(testDataDir)) {
       try {

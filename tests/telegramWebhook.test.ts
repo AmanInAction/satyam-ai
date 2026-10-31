@@ -171,8 +171,8 @@ describe('Phase 8: Telegram Bot Webhook Integration', () => {
 
       it('links Telegram to the website account and reads its purchased credits', async () => {
         const suffix = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
-        const user = defaultDb.createUser(`telegram-link-${suffix}@example.test`, 'securePassword');
-        const session = defaultDb.createSession(user.id);
+        const user = await defaultDb.createUser(`telegram-link-${suffix}@example.test`, 'securePassword');
+        const session = await defaultDb.createSession(user.id);
         const codeResponse = await createTelegramLinkCode(
           new NextRequest('http://localhost:3000/api/v1/telegram/link-code', {
             method: 'POST',
@@ -205,7 +205,7 @@ describe('Phase 8: Telegram Bot Webhook Integration', () => {
         });
 
         expect(linkReply?.text).toContain('Account linked');
-        expect(defaultDb.getTelegramLinkedUserId(String(chatId))).toBe(user.id);
+        expect(await defaultDb.getTelegramLinkedUserId(String(chatId))).toBe(user.id);
 
         const creditsReply = await botService.processUpdate({
           update_id: 91000002,

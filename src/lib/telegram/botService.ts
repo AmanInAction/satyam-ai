@@ -162,7 +162,7 @@ export class TelegramBotService {
 
       try {
         const codeHash = crypto.createHash('sha256').update(code).digest('hex');
-        const claim = defaultDb.claimTelegramLinkCode(codeHash, String(chatId));
+        const claim = await defaultDb.claimTelegramLinkCode(codeHash, String(chatId));
         if (claim.status === 'already_linked') {
           return {
             method: 'sendMessage',
@@ -183,7 +183,7 @@ export class TelegramBotService {
         }
 
         await defaultCreditLedger.migrateUser(`telegram_${chatId}`, claim.userId);
-        const linked = defaultDb.completeTelegramAccountLink(
+        const linked = await defaultDb.completeTelegramAccountLink(
           codeHash,
           String(chatId),
           claim.userId
@@ -220,7 +220,7 @@ export class TelegramBotService {
     }
 
     const telegramUserId =
-      defaultDb.getTelegramLinkedUserId(String(chatId)) || `telegram_${chatId}`;
+      await defaultDb.getTelegramLinkedUserId(String(chatId)) || `telegram_${chatId}`;
 
     if (commandLower === '/credits' || commandLower === '/balance') {
       const balance = await defaultCreditLedger.getBalance(telegramUserId);

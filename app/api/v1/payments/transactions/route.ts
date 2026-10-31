@@ -16,7 +16,7 @@ export async function OPTIONS() {
 
 export async function GET(req: NextRequest) {
   const requestId = generateRequestId();
-  const sessionInfo = getUserIdFromRequest(req);
+  const sessionInfo = await getUserIdFromRequest(req);
 
   try {
     const transactions = await defaultCreditLedger.getTransactions(sessionInfo.userId);

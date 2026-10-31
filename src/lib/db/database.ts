@@ -4,9 +4,10 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { DbUser, DbSession, DbAnalysis, DbTransaction, DbUserCreditState } from './schema';
 import { safeLogger } from '../security/logger';
+import { TursoDatabase } from './tursoDatabase';
 
 export class AppDatabase {
-  private db: DatabaseSync;
+  private db!: DatabaseSync;
   private dbPath: string;
 
   constructor(customPath?: string) {
@@ -16,13 +17,13 @@ export class AppDatabase {
       this.dbPath = ':memory:';
     } else {
       const dataDir = process.env.DATA_DIR || path.join(process.cwd(), '.data');
-      if (!fs.existsSync(dataDir)) {
-        fs.mkdirSync(dataDir, { recursive: true });
-      }
       this.dbPath = path.join(dataDir, 'satyam.sqlite');
     }
 
     try {
+      if (this.dbPath !== ':memory:') {
+        fs.mkdirSync(path.dirname(this.dbPath), { recursive: true });
+      }
       this.db = new DatabaseSync(this.dbPath);
       if (this.dbPath !== ':memory:') {
         this.db.exec('PRAGMA journal_mode = WAL;');
@@ -31,10 +32,8 @@ export class AppDatabase {
       this.initTables();
       safeLogger.info(`SQLite Database initialized successfully at: ${this.dbPath}`);
     } catch (err: unknown) {
-      safeLogger.warn(`SQLite initialization error (${(err as Error)?.message}). Falling back to :memory:`);
-      this.dbPath = ':memory:';
-      this.db = new DatabaseSync(':memory:');
-      this.initTables();
+      safeLogger.error(`SQLite initialization failed at ${this.dbPath}: ${(err as Error)?.message}`);
+      throw new Error(`Unable to initialize the SQLite database at ${this.dbPath}.`, { cause: err });
     }
   }
 
@@ -89,6 +88,13 @@ export class AppDatabase {
 
       CREATE INDEX IF NOT EXISTS idx_tx_user ON transactions(user_id, created_at DESC);
 
+      CREATE TABLE IF NOT EXISTS credit_balances (
+        user_id TEXT PRIMARY KEY,
+        balance REAL NOT NULL DEFAULT 0,
+        has_received_free_grant INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL
+      );
+
       CREATE TABLE IF NOT EXISTS anonymous_credit_migrations (
         anonymous_user_id TEXT PRIMARY KEY,
         authenticated_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -138,6 +144,34 @@ export class AppDatabase {
         ) THEN 1 ELSE 0 END
       `);
     }
+
+    this.db.exec(`
+      INSERT OR IGNORE INTO credit_balances (user_id, balance, has_received_free_grant, updated_at)
+      SELECT t.user_id, t.balance_after,
+             CASE WHEN EXISTS (
+               SELECT 1 FROM transactions grant_tx
+               WHERE grant_tx.user_id = t.user_id AND grant_tx.type = 'initial_grant'
+             ) THEN 1 ELSE 0 END,
+             t.created_at
+      FROM transactions t
+      WHERE t.rowid = (
+        SELECT latest.rowid FROM transactions latest
+        WHERE latest.user_id = t.user_id
+        ORDER BY latest.created_at DESC, latest.rowid DESC LIMIT 1
+      );
+
+      INSERT OR IGNORE INTO credit_balances (user_id, balance, has_received_free_grant, updated_at)
+      SELECT id, credits_available, has_received_free_grant, updated_at FROM users;
+
+      UPDATE users
+      SET credits_available = COALESCE((
+        SELECT balance FROM credit_balances WHERE credit_balances.user_id = users.id
+      ), credits_available),
+      has_received_free_grant = COALESCE((
+        SELECT has_received_free_grant FROM credit_balances
+        WHERE credit_balances.user_id = users.id
+      ), has_received_free_grant);
+    `);
   }
 
   public createTelegramLinkCode(userId: string, codeHash: string, expiresAt: number): void {
@@ -499,30 +533,52 @@ export class AppDatabase {
     metadata?: Record<string, unknown>;
     createdAt?: string;
   }): DbTransaction {
-    const now = tx.createdAt || new Date().toISOString();
-    const metadataStr = tx.metadata ? JSON.stringify(tx.metadata) : null;
-
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      this.insertTransaction(tx, metadataStr, now);
-      this.updateUserCreditState(tx.userId, tx.balanceAfter, tx.type === 'initial_grant');
+      if (tx.idempotencyKey) {
+        const existing = this.db.prepare(
+          'SELECT * FROM transactions WHERE idempotency_key = ? LIMIT 1'
+        ).get(tx.idempotencyKey) as DbTransaction | undefined;
+        if (existing) {
+          this.db.exec('COMMIT');
+          return existing;
+        }
+      }
+      const existingById = this.db.prepare(
+        'SELECT * FROM transactions WHERE id = ? LIMIT 1'
+      ).get(tx.id) as DbTransaction | undefined;
+      if (existingById) {
+        this.db.exec('COMMIT');
+        return existingById;
+      }
+
+      const state = this.getUserCreditState(tx.userId);
+      const previousBalance = state ? state.credits_available : tx.balanceAfter - tx.amount;
+      const balanceAfter = previousBalance + tx.amount;
+      if (balanceAfter < 0) throw new Error('Credit balance would become negative.');
+      const persistedTx = { ...tx, balanceAfter };
+      const now = tx.createdAt || new Date().toISOString();
+      const metadataStr = tx.metadata ? JSON.stringify(tx.metadata) : null;
+
+      this.insertTransaction(persistedTx, metadataStr, now);
+      this.updateUserCreditState(tx.userId, balanceAfter, tx.type === 'initial_grant');
       this.db.exec('COMMIT');
+
+      return {
+        id: tx.id,
+        user_id: tx.userId,
+        type: tx.type,
+        amount: tx.amount,
+        balance_after: balanceAfter,
+        reason: tx.reason,
+        idempotency_key: tx.idempotencyKey || null,
+        metadata_json: metadataStr,
+        created_at: now,
+      };
     } catch (err) {
       this.db.exec('ROLLBACK');
       throw err;
     }
-
-    return {
-      id: tx.id,
-      user_id: tx.userId,
-      type: tx.type,
-      amount: tx.amount,
-      balance_after: tx.balanceAfter,
-      reason: tx.reason,
-      idempotency_key: tx.idempotencyKey || null,
-      metadata_json: metadataStr,
-      created_at: now,
-    };
   }
 
   private insertTransaction(
@@ -556,26 +612,41 @@ export class AppDatabase {
   }
 
   private updateUserCreditState(userId: string, balance: number, receivedFreeGrant: boolean): void {
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      INSERT INTO credit_balances (user_id, balance, has_received_free_grant, updated_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET
+        balance = excluded.balance,
+        has_received_free_grant = CASE WHEN excluded.has_received_free_grant = 1
+          THEN 1 ELSE credit_balances.has_received_free_grant END,
+        updated_at = excluded.updated_at
+    `).run(userId, balance, receivedFreeGrant ? 1 : 0, now);
     this.db.prepare(`
       UPDATE users
       SET credits_available = ?,
           has_received_free_grant = CASE WHEN ? THEN 1 ELSE has_received_free_grant END,
           updated_at = ?
       WHERE id = ?
-    `).run(balance, receivedFreeGrant ? 1 : 0, new Date().toISOString(), userId);
+    `).run(balance, receivedFreeGrant ? 1 : 0, now, userId);
   }
 
   public getUserCreditState(userId: string): DbUserCreditState | null {
     const rows = this.db.prepare(`
+      SELECT user_id, balance AS credits_available, has_received_free_grant
+      FROM credit_balances WHERE user_id = ? LIMIT 1
+    `).all(userId) as unknown as DbUserCreditState[];
+    if (rows[0]) return rows[0];
+    const users = this.db.prepare(`
       SELECT id AS user_id, credits_available, has_received_free_grant
       FROM users WHERE id = ? LIMIT 1
     `).all(userId) as unknown as DbUserCreditState[];
-    return rows[0] || null;
+    return users[0] || null;
   }
 
   public getAllUserCreditStates(): DbUserCreditState[] {
     return this.db.prepare(`
-      SELECT id AS user_id, credits_available, has_received_free_grant FROM users
+      SELECT user_id, balance AS credits_available, has_received_free_grant FROM credit_balances
     `).all() as unknown as DbUserCreditState[];
   }
 
@@ -645,6 +716,7 @@ export class AppDatabase {
     this.db.exec(`
       DELETE FROM transactions;
       DELETE FROM anonymous_credit_migrations;
+      DELETE FROM credit_balances;
       UPDATE users SET credits_available = 0, has_received_free_grant = 0;
     `);
   }
@@ -659,21 +731,17 @@ export class AppDatabase {
   public migrateAnonymousData(anonymousUserId: string, authenticatedUserId: string): void {
     if (!anonymousUserId || !authenticatedUserId || anonymousUserId === authenticatedUserId) return;
 
+    this.db.exec('BEGIN IMMEDIATE');
     try {
-      // Re-assign past analyses
-      const updateAnalyses = this.db.prepare(`
-        UPDATE analyses SET user_id = ? WHERE user_id = ?
-      `);
-      updateAnalyses.run(authenticatedUserId, anonymousUserId);
-
-      const updateTransactions = this.db.prepare(`
-        UPDATE transactions SET user_id = ? WHERE user_id = ?
-      `);
-      updateTransactions.run(authenticatedUserId, anonymousUserId);
-
+      this.db.prepare('UPDATE analyses SET user_id = ? WHERE user_id = ?')
+        .run(authenticatedUserId, anonymousUserId);
+      this.db.prepare('UPDATE transactions SET user_id = ? WHERE user_id = ?')
+        .run(authenticatedUserId, anonymousUserId);
+      this.db.exec('COMMIT');
       safeLogger.info(`Migrated data from anonymous user ${anonymousUserId} to authenticated user ${authenticatedUserId}`);
-    } catch (err: unknown) {
-      safeLogger.warn(`Failed to migrate anonymous data: ${(err as Error)?.message}`);
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
     }
   }
 
@@ -692,5 +760,9 @@ declare global {
   var __satyam_app_db__: AppDatabase | undefined;
 }
 
-export const defaultDb: AppDatabase =
-  globalThis.__satyam_app_db__ ?? (globalThis.__satyam_app_db__ = new AppDatabase());
+export const defaultDb: AppDatabase | TursoDatabase =
+  process.env.VERCEL === '1' ||
+  process.env.TURSO_DATABASE_URL ||
+  process.env.NEXT_PHASE === 'phase-production-build'
+    ? new TursoDatabase()
+    : globalThis.__satyam_app_db__ ?? (globalThis.__satyam_app_db__ = new AppDatabase());

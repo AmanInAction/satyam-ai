@@ -13,9 +13,20 @@ import path from 'path';
 describe('SQLite Database & Auth Service', () => {
   let db: AppDatabase;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     db = new AppDatabase(':memory:');
-    defaultCreditLedger.reset();
+    await defaultCreditLedger.reset();
+  });
+
+  it('surfaces local database initialization failures instead of using memory storage', () => {
+    const blockingFile = path.join(process.cwd(), `.temp-db-blocker-${Date.now()}`);
+    fs.writeFileSync(blockingFile, 'not a directory');
+    try {
+      expect(() => new AppDatabase(path.join(blockingFile, 'satyam.sqlite')))
+        .toThrow('Unable to initialize the SQLite database');
+    } finally {
+      fs.unlinkSync(blockingFile);
+    }
   });
 
   it('adds and backfills persisted credit columns in an existing database', () => {
@@ -206,11 +217,11 @@ describe('SQLite Database & Auth Service', () => {
 
     const migrationLedger = new CreditLedgerService(tempDir);
 
+    const balance = await migrationLedger.getBalance('usr_legacy_user');
     // Verify file unlinked
     expect(fs.existsSync(legacyFile)).toBe(false);
 
     // Verify transaction loaded in SQLite and ledger
-    const balance = await migrationLedger.getBalance('usr_legacy_user');
     expect(balance.balance).toBe(3);
 
     // Clean up
@@ -219,8 +230,8 @@ describe('SQLite Database & Auth Service', () => {
 });
 
 describe('Auth & History API Route Handlers', () => {
-  beforeEach(() => {
-    defaultCreditLedger.reset();
+  beforeEach(async () => {
+    await defaultCreditLedger.reset();
   });
 
   it('registers a user, sets session cookie, and returns initial balance', async () => {
@@ -319,11 +330,11 @@ describe('Auth & History API Route Handlers', () => {
     const registerData = await registerRes.json();
     const userId = registerData.user.id as string;
     expect(registerData.balance).toBe(3);
-    expect(defaultDb.findUserById(userId)?.credits_available).toBe(3);
+    expect((await defaultDb.findUserById(userId))?.credits_available).toBe(3);
 
     const reservation = await defaultCreditLedger.reserveCredits(userId, 1, 'text');
     await defaultCreditLedger.commitReservation(reservation.reservationId, 'analysis_credit_1');
-    expect(defaultDb.findUserById(userId)?.credits_available).toBe(2);
+    expect((await defaultDb.findUserById(userId))?.credits_available).toBe(2);
 
     const reloginRes = await loginHandler(
       new NextRequest('http://localhost:3000/api/v1/auth/login', {
@@ -337,11 +348,32 @@ describe('Auth & History API Route Handlers', () => {
     );
     const reloginData = await reloginRes.json();
     expect(reloginData.balance).toBe(2);
-    expect(defaultDb.findUserById(userId)?.credits_available).toBe(2);
+    expect((await defaultDb.findUserById(userId))?.credits_available).toBe(2);
 
     const restartedLedger = new CreditLedgerService();
     expect((await restartedLedger.getBalance(userId)).balance).toBe(2);
     expect((await restartedLedger.getBalance(anonymousUserId)).balance).toBe(0);
+  });
+
+  it('keeps credit balances correct across concurrent ledger instances', async () => {
+    const userId = `concurrent_${Date.now()}`;
+    const firstLedger = new CreditLedgerService();
+    const secondLedger = new CreditLedgerService();
+    await firstLedger.getOrCreateUser(userId);
+
+    const [first, second] = await Promise.all([
+      firstLedger.reserveCredits(userId, 1, 'text'),
+      secondLedger.reserveCredits(userId, 1, 'text'),
+    ]);
+    await Promise.all([
+      firstLedger.commitReservation(first.reservationId, 'concurrent_analysis_1'),
+      secondLedger.commitReservation(second.reservationId, 'concurrent_analysis_2'),
+    ]);
+
+    expect((await firstLedger.getBalance(userId)).balance).toBe(1);
+    expect((await firstLedger.getTransactions(userId)).filter(
+      (transaction) => transaction.type === 'analysis_debit'
+    )).toHaveLength(2);
   });
 
   it('retrieves profile via /api/v1/auth/me for authenticated user', async () => {

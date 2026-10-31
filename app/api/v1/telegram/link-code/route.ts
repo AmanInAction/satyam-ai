@@ -20,7 +20,7 @@ export async function OPTIONS() {
 
 export async function POST(req: NextRequest) {
   const requestId = generateRequestId();
-  const session = getUserIdFromRequest(req);
+  const session = await getUserIdFromRequest(req);
 
   if (!session.isAuthenticated) {
     return createErrorResponse(
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   const codeHash = crypto.createHash('sha256').update(code).digest('hex');
 
   try {
-    defaultDb.createTelegramLinkCode(
+    await defaultDb.createTelegramLinkCode(
       session.userId,
       codeHash,
       Date.now() + LINK_CODE_TTL_MS

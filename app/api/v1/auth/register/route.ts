@@ -49,10 +49,10 @@ export async function POST(req: NextRequest) {
 
   try {
     // 1. Identify any prior anonymous session to seamlessly migrate credits & scans
-    const priorSession = getUserIdFromRequest(req);
+    const priorSession = await getUserIdFromRequest(req);
 
     // 2. Create the user in SQLite
-    const user = defaultDb.createUser(email, password, displayName);
+    const user = await defaultDb.createUser(email, password, displayName);
 
     // 3. Migrate credits from anonymous user if present, or initialize free credits
     if (priorSession.userId && priorSession.userId !== user.id) {
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Create persistent session token
-    const session = defaultDb.createSession(user.id);
+    const session = await defaultDb.createSession(user.id);
     const balanceInfo = await defaultCreditLedger.getBalance(user.id);
 
     const response = NextResponse.json({

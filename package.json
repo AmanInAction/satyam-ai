@@ -8,10 +8,13 @@
     "build": "next build",
     "start": "next start -p 3000 -H 0.0.0.0",
     "lint": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:migrate:turso": "node scripts/migrate-turso.mjs",
+    "db:import:turso": "node scripts/import-sqlite-to-turso.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.1151.0",
+    "@tursodatabase/serverless": "^1.4.1",
     "lucide-react": "^1.16.0",
     "next": "^15.1.0",
     "react": "^19.0.0",
