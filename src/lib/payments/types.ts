@@ -10,6 +10,8 @@ export type CreditTransactionType =
   | 'refund_reversal'
   | 'administrative_adjustment';
 
+export type PaymentCurrency = 'USD' | 'INR';
+
 export interface CreditTransaction {
   id: string;
   userId: string;
@@ -39,10 +41,17 @@ export interface CreditPackage {
   nameHi: string;
   credits: number;
   price: string; // e.g. "2.00"
-  currency: string; // e.g. "USD"
+  currency: PaymentCurrency;
+  prices: Record<PaymentCurrency, string>;
   description: string;
   descriptionHi: string;
   popular?: boolean;
+}
+
+export const SUPPORTED_PAYMENT_CURRENCIES = ['USD', 'INR'] as const;
+
+export function isPaymentCurrency(value: string): value is PaymentCurrency {
+  return SUPPORTED_PAYMENT_CURRENCIES.some((currency) => currency === value);
 }
 
 export interface CreditBalanceResponse {

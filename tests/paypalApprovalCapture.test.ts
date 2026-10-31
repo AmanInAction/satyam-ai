@@ -62,6 +62,49 @@ describe('PayPal Sandbox Approval and Capture Lifecycle', () => {
       expect(approveLink.href).toBe(data.approveUrl);
     });
 
+    it('creates and captures an INR order with the configured INR price', async () => {
+      const userId = 'usr_inr_buyer';
+      const createReq = new NextRequest('http://localhost:3000/api/v1/payments/create-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId,
+        },
+        body: JSON.stringify({
+          packageId: 'plus',
+          currency: 'INR',
+        }),
+      });
+
+      const createRes = await handleCreateOrderPost(createReq);
+      expect(createRes.status).toBe(200);
+      const orderData = await createRes.json();
+      expect(orderData.package.price).toBe('419.00');
+      expect(orderData.package.currency).toBe('INR');
+      defaultPayPalClient.approveOrder(orderData.orderId);
+
+      const captureReq = new NextRequest('http://localhost:3000/api/v1/payments/capture-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId,
+        },
+        body: JSON.stringify({
+          orderId: orderData.orderId,
+          packageId: 'plus',
+          currency: 'INR',
+        }),
+      });
+      const captureRes = await handleCaptureOrderPost(captureReq);
+
+      expect(captureRes.status).toBe(200);
+      const captureData = await captureRes.json();
+      expect(captureData.package.price).toBe('419.00');
+      expect(captureData.package.currency).toBe('INR');
+      expect(captureData.transaction.metadata.price).toBe('419.00');
+      expect(captureData.transaction.metadata.currency).toBe('INR');
+    });
+
     it('rejects order creation for non-existent package with HTTP 404', async () => {
       const req = new NextRequest('http://localhost:3000/api/v1/payments/create-order', {
         method: 'POST',

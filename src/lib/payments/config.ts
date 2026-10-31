@@ -1,4 +1,4 @@
-import { CreditPackage } from './types';
+import { CreditPackage, PaymentCurrency } from './types';
 
 /**
  * Global configuration for SatyamAI's Credit System and PayPal Sandbox Integration.
@@ -20,6 +20,7 @@ export const CREDIT_PACKAGES: CreditPackage[] = [
     credits: 10,
     price: '2.00',
     currency: 'USD',
+    prices: { USD: '2.00', INR: '169.00' },
     description: '10 Verification Credits for suspicious messages & URLs',
     descriptionHi: 'संदिग्ध संदेशों और लिंक की जांच के लिए 10 क्रेडिट',
     popular: false,
@@ -31,6 +32,7 @@ export const CREDIT_PACKAGES: CreditPackage[] = [
     credits: 30,
     price: '5.00',
     currency: 'USD',
+    prices: { USD: '5.00', INR: '419.00' },
     description: '30 Verification Credits (Best Value for Family Protection)',
     descriptionHi: '30 क्रेडिट (पारिवारिक सुरक्षा के लिए सर्वोत्तम मूल्य)',
     popular: true,
@@ -42,14 +44,21 @@ export const CREDIT_PACKAGES: CreditPackage[] = [
     credits: 100,
     price: '12.00',
     currency: 'USD',
+    prices: { USD: '12.00', INR: '999.00' },
     description: '100 Verification Credits for high-volume community or group checking',
     descriptionHi: 'कम्युनिटी या ग्रुप चेकिंग के लिए 100 सत्यापन क्रेडिट',
     popular: false,
   },
 ];
 
-export function getCreditPackageById(packageId: string): CreditPackage | undefined {
-  return CREDIT_PACKAGES.find((pkg) => pkg.id === packageId);
+export function getCreditPackageById(
+  packageId: string,
+  currency: PaymentCurrency = 'USD'
+): CreditPackage | undefined {
+  const pkg = CREDIT_PACKAGES.find((packageOption) => packageOption.id === packageId);
+  const price = pkg?.prices[currency];
+
+  return pkg && price ? { ...pkg, currency, price } : undefined;
 }
 
 export function getPayPalConfig() {

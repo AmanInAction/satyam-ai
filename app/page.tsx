@@ -143,7 +143,8 @@ export default function Home() {
             {CREDIT_PACKAGES.map((pkg) => (
               <div key={pkg.id} className="rounded-2xl border border-slate-700 bg-slate-800 p-6">
                 <h3 className="font-bold">{pkg.name}</h3>
-                <p className="mt-5 text-3xl font-bold">${pkg.price}<span className="text-sm font-medium text-slate-400"> {pkg.currency}</span></p>
+                <p className="mt-5 text-3xl font-bold">${pkg.price}<span className="text-sm font-medium text-slate-400"> USD</span></p>
+                <p className="mt-1 text-sm font-semibold text-slate-300">or ₹{pkg.prices.INR} INR</p>
                 <p className="mt-2 text-sm text-slate-300">{pkg.credits} checks; checks never expire.</p>
                 <div className="mt-5 flex items-center gap-2 text-xs text-slate-300"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Pay securely with PayPal</div>
               </div>

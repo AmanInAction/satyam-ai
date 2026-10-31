@@ -150,8 +150,8 @@ sequenceDiagram
     participant Ledger as Durable Credit Ledger
     participant DB as SQLite DB
 
-    User->>UI: Selects Package (e.g. Value Pack: 25 checks / $5.00)
-    UI->>PayAPI: POST /api/v1/payments/create-order { packageId: "pack_25" }
+    User->>UI: Selects Package and currency (USD or INR)
+    UI->>PayAPI: POST /api/v1/payments/create-order { packageId: "plus", currency: "INR" }
     PayAPI->>Gateway: Create order with validated currency & price
     Gateway-->>PayAPI: Order ID (ORD-12345) + approvalUrl
     PayAPI-->>UI: Order details
@@ -160,7 +160,7 @@ sequenceDiagram
     Gateway-->>UI: Redirect back with token & PayerID
     UI->>PayAPI: POST /api/v1/payments/capture-order { orderId: "ORD-12345" }
     PayAPI->>Gateway: Capture authorized order
-    Gateway-->>PayAPI: Status: COMPLETED, Amount: $5.00 USD
+    Gateway-->>PayAPI: Status: COMPLETED, Amount: ₹419.00 INR
     PayAPI->>Ledger: addPurchaseCredits(userId, credits=25, orderId, captureId)
     Note over Ledger: Idempotency check: rejects if orderId already credited
     Ledger->>DB: Record purchase_credit transaction
@@ -283,6 +283,7 @@ npm run build
 
 ### Telegram Bot Webhook
 * `POST /api/v1/telegram/webhook`: Reuses the central analysis pipeline for text and links sent via Telegram.
+* To sync paid website checks with Telegram: sign in on the website, open **Account**, generate a one-time link code, then send `/link CODE` to the bot in a private chat. Use `/credits` to check the shared balance. Codes expire after 10 minutes.
 
 ---
 

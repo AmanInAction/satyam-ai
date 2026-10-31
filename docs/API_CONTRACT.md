@@ -32,6 +32,7 @@
 | GET | `/api/v1/payments/transactions` | P1 | Chronological audit ledger of all balance changes |
 | POST | `/api/v1/payments/webhook` | P1 | Asynchronous webhook handler for payment capture/refund |
 | POST | `/api/v1/telegram/webhook` | P1 | Telegram Bot webhook with deduplication and helpline routing |
+| POST | `/api/v1/telegram/link-code` | P1 | Create a one-time code to link an authenticated website account to Telegram |
 
 Do not implement optional endpoints before their phase. Confirm current route names in the repository before making changes.
 
@@ -248,7 +249,7 @@ Main update handler receiving Telegram Bot API Webhook updates.
 - **Security Header:** `X-Telegram-Bot-Api-Secret-Token` (validated against `TELEGRAM_WEBHOOK_SECRET` when configured).
 - **Rate Limit:** 30 requests/minute per chat ID.
 - **Deduplication:** Automatic `update_id` in-memory deduplication window (15 minutes).
-- **Supported Commands:** `/start`, `/help`.
+- **Supported Commands:** `/start`, `/help`, `/credits`, `/balance`, and `/link CODE`.
 - **Supported Content:** Text messages, forwarded SMS/WhatsApp forwards, URLs.
 - **Response `200 OK` (Direct Telegram reply payload):**
 ```json
@@ -265,10 +266,22 @@ Main update handler receiving Telegram Bot API Webhook updates.
   - `401 UNAUTHORIZED_WEBHOOK`: Secret token mismatch.
   - `400 INVALID_JSON`: Malformed update payload.
 
+### 3. `POST /api/v1/telegram/link-code`
+Creates a one-time code for the authenticated website account. The code expires after 10 minutes and is returned only once. Send `/link CODE` to the bot in a private chat to share the website credit balance with Telegram.
+- **Authentication:** A valid `satyam_session_token` cookie or bearer session token is required. Anonymous sessions are not accepted.
+- **Response `200 OK`:**
+```json
+{
+  "code": "one-time-secret",
+  "expiresInSeconds": 600
+}
+```
+- Existing unlinked Telegram credits are migrated into the website account during linking.
+
 ## Payment & Credit Monetization Endpoints
 
 ### 1. `GET /api/v1/payments/credits`
-Retrieves current user credit balance, operation costs, and available PayPal purchase packages. Idempotently grants 3 free credits to new users on initial request.
+Retrieves current user credit balance, operation costs, and available PayPal purchase packages. Packages include USD and INR prices. Idempotently grants 3 free credits to new users on initial request.
 - **Headers:** Optional `X-User-Id` (or session cookie `satyam_user_id`).
 - **Response `200 OK`:**
 ```json
@@ -292,6 +305,7 @@ Retrieves current user credit balance, operation costs, and available PayPal pur
       "credits": 10,
       "price": "2.00",
       "currency": "USD",
+      "prices": { "USD": "2.00", "INR": "169.00" },
       "description": "10 Verification Credits for suspicious messages & URLs",
       "popular": false
     },
@@ -302,6 +316,7 @@ Retrieves current user credit balance, operation costs, and available PayPal pur
       "credits": 30,
       "price": "5.00",
       "currency": "USD",
+      "prices": { "USD": "5.00", "INR": "419.00" },
       "description": "30 Verification Credits (Best Value for Family Protection)",
       "popular": true
     },
@@ -312,6 +327,7 @@ Retrieves current user credit balance, operation costs, and available PayPal pur
       "credits": 100,
       "price": "12.00",
       "currency": "USD",
+      "prices": { "USD": "12.00", "INR": "999.00" },
       "description": "100 Verification Credits for high-volume community checking",
       "popular": false
     }
@@ -324,11 +340,12 @@ Retrieves current user credit balance, operation costs, and available PayPal pur
 ```
 
 ### 2. `POST /api/v1/payments/create-order`
-Creates a PayPal checkout order for a configured credit package.
+Creates a PayPal checkout order for a configured credit package. `currency` is optional and defaults to `USD`; supported values are `USD` and `INR`.
 - **Request:**
 ```json
 {
-  "packageId": "plus"
+  "packageId": "plus",
+  "currency": "INR"
 }
 ```
 - **Response `200 OK`:**
@@ -336,8 +353,8 @@ Creates a PayPal checkout order for a configured credit package.
 {
   "orderId": "SIM_ORDER_1792411819916_AF3O4",
   "packageId": "plus",
-  "amount": "5.00",
-  "currency": "USD",
+  "amount": "419.00",
+  "currency": "INR",
   "status": "CREATED",
   "approvalUrl": "https://www.sandbox.paypal.com/checkoutnow?token=SIM_ORDER_1792411819916_AF3O4",
   "simulated": true
@@ -346,11 +363,13 @@ Creates a PayPal checkout order for a configured credit package.
 
 ### 3. `POST /api/v1/payments/capture-order`
 Captures an approved PayPal order and idempotently credits the user's ledger.
+- **Request:** `currency` is optional and defaults to `USD` for existing clients. It must match the order's captured currency and configured package price.
 - **Request:**
 ```json
 {
   "orderId": "SIM_ORDER_1792411819916_AF3O4",
-  "packageId": "plus"
+  "packageId": "plus",
+  "currency": "INR"
 }
 ```
 - **Response `200 OK`:**
@@ -409,5 +428,3 @@ Returns the chronological transaction history from the durable credit ledger.
 Webhook endpoint receiving verified PayPal event notifications (`PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.REFUNDED`, `PAYMENT.CAPTURE.REVERSED`).
 - **Security:** Verified with PayPal webhook signature (`verifyWebhookSignature`).
 - **Idempotency:** Webhook events are processed idempotently; duplicate events return `200 OK` with `already_processed: true`.
-
-

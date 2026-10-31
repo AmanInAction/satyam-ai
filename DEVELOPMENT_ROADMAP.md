@@ -149,7 +149,7 @@ The migration report says the repository was moved to a full-stack Next.js App R
   - Official PayPal Orders v2 and OAuth 2.0 client credentials integration (`src/lib/payments/paypalClient.ts`).
   - Sandbox-first default mode (`PAYPAL_ENV=sandbox`, `https://api-m.sandbox.paypal.com`) with zero risk to customer funds.
   - Server-side order creation (`POST /api/v1/payments/create-order`) and server-side capture verification (`POST /api/v1/payments/capture-order`).
-  - Strict validation of order status (`COMPLETED`), currency (`USD`), amount, merchant/payee, and package matching.
+  - Strict validation of order status (`COMPLETED`), currency (`USD` or `INR`), amount, merchant/payee, and package matching.
   - Webhook processing with cryptographic signature verification (`POST /api/v1/payments/webhook`) supporting `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.REFUNDED`, and `PAYMENT.CAPTURE.REVERSED`.
   - Idempotent order capture tracking prevents re-crediting the same order or webhook twice.
   - Safe refund handling: deducts refunded credits without driving user balance below zero.
@@ -157,6 +157,7 @@ The migration report says the repository was moved to a full-stack Next.js App R
   - Starter Package: 10 Credits for $2.00 USD.
   - Plus Package (Popular): 30 Credits for $5.00 USD.
   - Pro Security Package: 100 Credits for $12.00 USD.
+  - INR pricing: Starter ₹169, Plus ₹419, and Pro ₹999.
 - [x] **Persistent Transaction Ledger & Audit Journal:**
   - Durable append-only journal (`.data/credit_ledger.jsonl`) recording timestamp, transaction type, amount, balanceAfter, reference, and reason (`src/lib/payments/ledger.ts`).
   - Chronological transaction audit endpoint (`GET /api/v1/payments/transactions`).

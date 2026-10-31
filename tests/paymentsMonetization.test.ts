@@ -321,6 +321,63 @@ describe('Phase 9: PayPal Sandbox & Credit Monetization Engine', () => {
       expect(balanceAfterReplay.balance).toBe(33);
     });
 
+    it('processes a completed INR payment webhook using INR package pricing', async () => {
+      const userId = 'usr_webhook_inr';
+      const webhookPayload = {
+        id: 'WH_EVT_INR_1001',
+        event_type: 'PAYMENT.CAPTURE.COMPLETED',
+        resource_type: 'capture',
+        create_time: new Date().toISOString(),
+        resource: {
+          id: 'CAP_WH_INR_123',
+          status: 'COMPLETED',
+          custom_id: `${userId}:plus:INR`,
+          amount: {
+            value: '419.00',
+            currency_code: 'INR',
+          },
+        },
+      };
+      const req = new NextRequest('http://localhost:3000/api/v1/payments/webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(webhookPayload),
+      });
+
+      const res = await handleWebhookPost(req);
+      expect(res.status).toBe(200);
+      const balance = await defaultCreditLedger.getBalance(userId);
+      expect(balance.balance).toBe(33);
+    });
+
+    it('does not credit a webhook when the captured currency differs from the order currency', async () => {
+      const userId = 'usr_webhook_currency_mismatch';
+      const webhookPayload = {
+        id: 'WH_EVT_CURRENCY_MISMATCH',
+        event_type: 'PAYMENT.CAPTURE.COMPLETED',
+        resource_type: 'capture',
+        create_time: new Date().toISOString(),
+        resource: {
+          id: 'CAP_WH_CURRENCY_MISMATCH',
+          status: 'COMPLETED',
+          custom_id: `${userId}:plus:INR`,
+          amount: {
+            value: '5.00',
+            currency_code: 'USD',
+          },
+        },
+      };
+      const req = new NextRequest('http://localhost:3000/api/v1/payments/webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(webhookPayload),
+      });
+
+      await handleWebhookPost(req);
+      const balance = await defaultCreditLedger.getBalance(userId);
+      expect(balance.balance).toBe(3);
+    });
+
     it('processes PAYMENT.CAPTURE.REFUNDED and deducts credits without going below zero', async () => {
       const userId = 'usr_refund_11';
       // Grant credits first via testLedger

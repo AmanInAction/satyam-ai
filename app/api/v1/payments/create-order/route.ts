@@ -6,9 +6,11 @@ import { getUserIdFromRequest, attachUserSessionHeaders } from '@/src/lib/paymen
 import { defaultRateLimiter } from '@/src/lib/security/rateLimiter';
 import { createErrorResponse, generateRequestId } from '@/src/lib/errors/apiError';
 import { safeLogger } from '@/src/lib/security/logger';
+import { SUPPORTED_PAYMENT_CURRENCIES } from '@/src/lib/payments/types';
 
 const CreateOrderSchema = z.object({
   packageId: z.string().min(1, 'Package ID is required.'),
+  currency: z.enum(SUPPORTED_PAYMENT_CURRENCIES).default('USD'),
   returnUrl: z.string().url().optional(),
   cancelUrl: z.string().url().optional(),
 });
@@ -57,8 +59,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { packageId, returnUrl, cancelUrl } = parseResult.data;
-  const pkg = getCreditPackageById(packageId);
+  const { packageId, currency, returnUrl, cancelUrl } = parseResult.data;
+  const pkg = getCreditPackageById(packageId, currency);
   if (!pkg) {
     return createErrorResponse(
       404,
@@ -73,16 +75,17 @@ export async function POST(req: NextRequest) {
   const proto = req.headers.get('x-forwarded-proto') || 'http';
   const origin = `${proto}://${host}`;
   const effectiveReturnUrl =
-    returnUrl || `${origin}/analyze?paypal_return=true&package_id=${packageId}`;
+    returnUrl || `${origin}/analyze?paypal_return=true&package_id=${packageId}&currency=${currency}`;
   const effectiveCancelUrl =
-    cancelUrl || `${origin}/analyze?paypal_cancel=true&package_id=${packageId}`;
+    cancelUrl || `${origin}/analyze?paypal_cancel=true&package_id=${packageId}&currency=${currency}`;
 
   try {
     const order = await defaultPayPalClient.createOrder(
       packageId,
       sessionInfo.userId,
       effectiveReturnUrl,
-      effectiveCancelUrl
+      effectiveCancelUrl,
+      currency
     );
 
     const approveLink = order.links?.find((l) => l.rel === 'approve');

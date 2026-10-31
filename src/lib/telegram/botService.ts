@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { TelegramUpdate, TelegramSendMessagePayload } from './types';
 import { defaultUpdateTracker, TelegramUpdateTracker } from './updateTracker';
 import {
@@ -9,12 +10,15 @@ import {
   formatErrorMessage,
   formatCreditsExhaustedMessage,
   formatCreditsStatusMessage,
+  formatTelegramLinkInstructions,
+  formatTelegramLinkResult,
 } from './formatter';
 import { AnalysisOrchestrator, defaultOrchestrator } from '../analysis/orchestrator';
 import { defaultCreditLedger } from '../payments/ledger';
 import { CreditReservation } from '../payments/types';
 import { safeLogger } from '../security/logger';
 import { generateRequestId } from '../errors/apiError';
+import { defaultDb } from '../db/database';
 
 export interface TelegramBotServiceOptions {
   orchestrator?: AnalysisOrchestrator;
@@ -113,7 +117,7 @@ export class TelegramBotService {
     }
 
     // 4. Handle Telegram Commands
-    const commandLower = rawText.toLowerCase().split(/\s+/)[0];
+    const commandLower = rawText.toLowerCase().split(/\s+/)[0].split('@')[0];
     if (commandLower === '/start') {
       return {
         method: 'sendMessage',
@@ -134,7 +138,89 @@ export class TelegramBotService {
       };
     }
 
-    const telegramUserId = `telegram_${chatId}`;
+    if (commandLower === '/link') {
+      if (message.chat.type !== 'private' || message.from?.id !== chatId) {
+        return {
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: 'For account security, link your SatyamAI account in a private chat with this bot.',
+          parse_mode: 'Markdown',
+          reply_to_message_id: message.message_id,
+        };
+      }
+
+      const code = rawText.split(/\s+/)[1] || '';
+      if (!/^[A-Za-z0-9_-]{43}$/.test(code)) {
+        return {
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: formatTelegramLinkInstructions(),
+          parse_mode: 'Markdown',
+          reply_to_message_id: message.message_id,
+        };
+      }
+
+      try {
+        const codeHash = crypto.createHash('sha256').update(code).digest('hex');
+        const claim = defaultDb.claimTelegramLinkCode(codeHash, String(chatId));
+        if (claim.status === 'already_linked') {
+          return {
+            method: 'sendMessage',
+            chat_id: chatId,
+            text: formatTelegramLinkResult('already_linked'),
+            parse_mode: 'Markdown',
+            reply_to_message_id: message.message_id,
+          };
+        }
+        if (claim.status !== 'claimed') {
+          return {
+            method: 'sendMessage',
+            chat_id: chatId,
+            text: formatTelegramLinkResult(claim.status),
+            parse_mode: 'Markdown',
+            reply_to_message_id: message.message_id,
+          };
+        }
+
+        await defaultCreditLedger.migrateUser(`telegram_${chatId}`, claim.userId);
+        const linked = defaultDb.completeTelegramAccountLink(
+          codeHash,
+          String(chatId),
+          claim.userId
+        );
+        if (!linked) {
+          return {
+            method: 'sendMessage',
+            chat_id: chatId,
+            text: formatTelegramLinkResult('invalid_code'),
+            parse_mode: 'Markdown',
+            reply_to_message_id: message.message_id,
+          };
+        }
+
+        return {
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: formatTelegramLinkResult('linked'),
+          parse_mode: 'Markdown',
+          reply_to_message_id: message.message_id,
+        };
+      } catch (err: unknown) {
+        safeLogger.error(`Unable to link Telegram account: ${(err as Error)?.message}`, {
+          chatId,
+        });
+        return {
+          method: 'sendMessage',
+          chat_id: chatId,
+          text: '❌ Account linking failed unexpectedly. Please generate a new code and try again.',
+          parse_mode: 'Markdown',
+          reply_to_message_id: message.message_id,
+        };
+      }
+    }
+
+    const telegramUserId =
+      defaultDb.getTelegramLinkedUserId(String(chatId)) || `telegram_${chatId}`;
 
     if (commandLower === '/credits' || commandLower === '/balance') {
       const balance = await defaultCreditLedger.getBalance(telegramUserId);

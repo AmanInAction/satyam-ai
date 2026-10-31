@@ -160,7 +160,7 @@ Record material decisions so the solo developer and coding agent can understand 
   3. **Official PayPal Sandbox Integration (`src/lib/payments/paypalClient.ts`):**
      - Server-side OAuth 2.0 access-token acquisition with token caching.
      - PayPal Orders v2 API checkout creation (`POST /api/v1/payments/create-order`) and capture verification (`POST /api/v1/payments/capture-order`).
-     - Strict verification: matches captured status (`COMPLETED`), amount, currency (`USD`), and package configuration.
+     - Strict verification: matches captured status (`COMPLETED`), amount, currency (`USD` or `INR`), and package configuration.
      - Webhook handler (`POST /api/v1/payments/webhook`) with cryptographic signature check (`verifyWebhookSignature`).
      - Safe refund reconciliation: reduces credit balances on `PAYMENT.CAPTURE.REFUNDED` while bounding balances at 0.
   4. **Durable Append-Only Transaction Journal:**

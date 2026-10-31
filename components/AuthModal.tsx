@@ -12,6 +12,7 @@ import {
   Sparkles,
   AlertCircle,
   Loader2,
+  Link2,
 } from 'lucide-react';
 
 export interface UserProfile {
@@ -47,6 +48,9 @@ export function AuthModal({
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [telegramCode, setTelegramCode] = useState<string | null>(null);
+  const [telegramCodeLoading, setTelegramCodeLoading] = useState(false);
+  const [telegramCodeError, setTelegramCodeError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -92,6 +96,24 @@ export function AuthModal({
       // ignore
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGenerateTelegramCode = async () => {
+    setTelegramCodeLoading(true);
+    setTelegramCodeError(null);
+    setTelegramCode(null);
+    try {
+      const res = await fetch('/api/v1/telegram/link-code', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error?.message || 'Unable to create a Telegram link code.');
+      }
+      setTelegramCode(data.code);
+    } catch (err: unknown) {
+      setTelegramCodeError((err as Error).message);
+    } finally {
+      setTelegramCodeLoading(false);
     }
   };
 
@@ -142,6 +164,33 @@ export function AuthModal({
             <p className="text-xs text-slate-500">
               Your checks, scans, and transaction records are persistently saved to your SQLite database account.
             </p>
+
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                <Link2 className="h-4 w-4 text-blue-700" />
+                Sync Telegram checks
+              </div>
+              <p className="text-xs text-slate-600">
+                Generate a one-time code, then send <code>/link CODE</code> to the SatyamAI bot in a private chat.
+                Codes expire after 10 minutes.
+              </p>
+              {telegramCode && (
+                <div className="rounded-lg border border-blue-200 bg-white p-2 text-center">
+                  <code className="break-all text-xs font-semibold text-blue-800">{telegramCode}</code>
+                </div>
+              )}
+              {telegramCodeError && (
+                <p className="text-xs text-rose-700">{telegramCodeError}</p>
+              )}
+              <button
+                type="button"
+                onClick={handleGenerateTelegramCode}
+                disabled={telegramCodeLoading}
+                className="w-full rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
+              >
+                {telegramCodeLoading ? 'Generating code...' : 'Generate Telegram link code'}
+              </button>
+            </div>
 
             <button
               type="button"

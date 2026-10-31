@@ -4,7 +4,7 @@ import { defaultCreditLedger } from '@/src/lib/payments/ledger';
 import { getCreditPackageById } from '@/src/lib/payments/config';
 import { createErrorResponse, generateRequestId } from '@/src/lib/errors/apiError';
 import { safeLogger } from '@/src/lib/security/logger';
-import { PayPalWebhookEvent } from '@/src/lib/payments/types';
+import { isPaymentCurrency, PayPalWebhookEvent } from '@/src/lib/payments/types';
 
 export async function OPTIONS() {
   return new NextResponse(null, {
@@ -73,11 +73,27 @@ export async function POST(req: NextRequest) {
         const captureId = capture.id;
         const orderId =
           capture.supplementary_data?.related_ids?.order_id || capture.invoice_id || captureId;
-        const customId = capture.custom_id || ''; // formatted as "userId:packageId"
+        const customId = capture.custom_id || ''; // formatted as "userId:packageId[:currency]"
 
         if (customId && customId.includes(':')) {
-          const [userId, packageId] = customId.split(':');
-          const pkg = getCreditPackageById(packageId);
+          const [userId, packageId, customCurrency] = customId.split(':');
+          const currencyCode = capture.amount?.currency_code || customCurrency || 'USD';
+          if (customCurrency && !isPaymentCurrency(customCurrency)) {
+            safeLogger.error(`Unsupported payment currency in webhook custom ID: ${customCurrency}`);
+            break;
+          }
+          if (!isPaymentCurrency(currencyCode)) {
+            safeLogger.error(`Unsupported payment currency in webhook: ${currencyCode}`);
+            break;
+          }
+          if (customCurrency && customCurrency !== currencyCode) {
+            safeLogger.error(
+              `Webhook currency mismatch: order expected ${customCurrency}, captured ${currencyCode}`
+            );
+            break;
+          }
+          const currency = currencyCode;
+          const pkg = getCreditPackageById(packageId, currency);
 
           if (pkg && userId) {
             // Verify captured amount and currency

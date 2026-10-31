@@ -5,6 +5,7 @@ import {
   PayPalOrderDetails,
   PayPalCaptureResponse,
   WebhookVerificationResponse,
+  PaymentCurrency,
 } from './types';
 import { safeLogger } from '../security/logger';
 
@@ -35,7 +36,7 @@ interface SimulatedOrderRecord {
   userId: string;
   status: 'CREATED' | 'APPROVED' | 'COMPLETED' | 'CANCELLED';
   amount: string;
-  currency: string;
+  currency: PaymentCurrency;
   createdAt: number;
 }
 
@@ -170,7 +171,9 @@ export class PayPalClient {
   async getOrder(orderId: string): Promise<PayPalOrderDetails> {
     if (!this.isConfigured() || orderId.startsWith('SIM_ORDER_') || orderId === '8BV01433166897441') {
       const sim = getSimulatedOrdersStore().get(orderId);
-      const pkg = sim ? getCreditPackageById(sim.packageId) : getCreditPackageById('plus');
+      const pkg = sim
+        ? getCreditPackageById(sim.packageId, sim.currency)
+        : getCreditPackageById('plus');
       let status: 'CREATED' | 'SAVED' | 'APPROVED' | 'VOIDED' | 'COMPLETED' | 'PAYER_ACTION_REQUIRED';
       if (sim?.status === 'CANCELLED') {
         status = 'VOIDED';
@@ -190,8 +193,8 @@ export class PayPalClient {
           {
             reference_id: pkg?.id || 'plus',
             amount: {
-              currency_code: pkg?.currency || 'USD',
-              value: pkg?.price || '5.00',
+              currency_code: sim?.currency || pkg?.currency || 'USD',
+              value: sim?.amount || pkg?.price || '5.00',
             },
           },
         ],
@@ -230,9 +233,10 @@ export class PayPalClient {
     packageId: string,
     userId: string,
     returnUrl?: string,
-    cancelUrl?: string
+    cancelUrl?: string,
+    currency: PaymentCurrency = 'USD'
   ): Promise<PayPalOrderResponse> {
-    const pkg = getCreditPackageById(packageId);
+    const pkg = getCreditPackageById(packageId, currency);
     if (!pkg) {
       throw new Error(`Invalid credit package ID: ${packageId}`);
     }
@@ -285,7 +289,7 @@ export class PayPalClient {
         {
           reference_id: pkg.id,
           description: `SatyamAI ${pkg.name} (${pkg.credits} Analysis Credits)`,
-          custom_id: `${userId}:${pkg.id}`,
+          custom_id: `${userId}:${pkg.id}:${pkg.currency}`,
           amount: {
             currency_code: pkg.currency,
             value: pkg.price,
@@ -333,7 +337,11 @@ export class PayPalClient {
   /**
    * Captures an approved PayPal order and validates payment completion.
    */
-  async captureOrder(orderId: string, packageId?: string): Promise<PayPalCaptureResponse> {
+  async captureOrder(
+    orderId: string,
+    packageId?: string,
+    currency: PaymentCurrency = 'USD'
+  ): Promise<PayPalCaptureResponse> {
     const sim = getSimulatedOrdersStore().get(orderId);
 
     if (sim && sim.status === 'CANCELLED') {
@@ -374,7 +382,7 @@ export class PayPalClient {
     if (!this.isConfigured() || orderId.startsWith('SIM_ORDER_')) {
       // Simulated Sandbox capture for approved orders
       const effectivePackageId = sim?.packageId || packageId || 'plus';
-      const pkg = getCreditPackageById(effectivePackageId);
+      const pkg = getCreditPackageById(effectivePackageId, sim?.currency || currency);
       const mockCaptureId = `SIM_CAPTURE_${Date.now()}_${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
       if (sim) {
@@ -394,8 +402,8 @@ export class PayPalClient {
                   id: mockCaptureId,
                   status: 'COMPLETED',
                   amount: {
-                    currency_code: pkg?.currency || 'USD',
-                    value: pkg?.price || '5.00',
+                    currency_code: sim?.currency || pkg?.currency || 'USD',
+                    value: sim?.amount || pkg?.price || '5.00',
                   },
                 },
               ],

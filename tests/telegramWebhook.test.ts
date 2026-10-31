@@ -5,6 +5,9 @@ import { TelegramBotService } from '../src/lib/telegram/botService';
 import { TelegramUpdateTracker } from '../src/lib/telegram/updateTracker';
 import { AnalysisOrchestrator } from '../src/lib/analysis/orchestrator';
 import { TelegramUpdate } from '../src/lib/telegram/types';
+import { POST as createTelegramLinkCode } from '../app/api/v1/telegram/link-code/route';
+import { defaultDb } from '../src/lib/db/database';
+import { defaultCreditLedger } from '../src/lib/payments/ledger';
 import {
   formatStartMessage,
   formatHelpMessage,
@@ -154,6 +157,69 @@ describe('Phase 8: Telegram Bot Webhook Integration', () => {
       expect(reply?.text).toContain('नमस्ते');
       expect(reply?.text).toContain('1930');
       expect(reply?.text).toContain('cybercrime.gov.in');
+    });
+
+    describe('Website account and credit synchronization', () => {
+      it('requires an authenticated website account to generate a link code', async () => {
+        const res = await createTelegramLinkCode(
+          new NextRequest('http://localhost:3000/api/v1/telegram/link-code', {
+            method: 'POST',
+          })
+        );
+        expect(res.status).toBe(401);
+      });
+
+      it('links Telegram to the website account and reads its purchased credits', async () => {
+        const suffix = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const user = defaultDb.createUser(`telegram-link-${suffix}@example.test`, 'securePassword');
+        const session = defaultDb.createSession(user.id);
+        const codeResponse = await createTelegramLinkCode(
+          new NextRequest('http://localhost:3000/api/v1/telegram/link-code', {
+            method: 'POST',
+            headers: { Cookie: `satyam_session_token=${session.token}` },
+          })
+        );
+        expect(codeResponse.status).toBe(200);
+        const { code } = await codeResponse.json();
+
+        await defaultCreditLedger.addPurchaseCredits(
+          user.id,
+          30,
+          `ORDER_TG_${suffix}`,
+          `CAP_TG_${suffix}`,
+          'plus',
+          '5.00',
+          'USD'
+        );
+
+        const chatId = 91900001;
+        const linkReply = await botService.processUpdate({
+          update_id: 91000001,
+          message: {
+            message_id: 1,
+            date: Math.floor(Date.now() / 1000),
+            from: { id: chatId, is_bot: false, first_name: 'Test' },
+            chat: { id: chatId, type: 'private' },
+            text: `/link ${code}`,
+          },
+        });
+
+        expect(linkReply?.text).toContain('Account linked');
+        expect(defaultDb.getTelegramLinkedUserId(String(chatId))).toBe(user.id);
+
+        const creditsReply = await botService.processUpdate({
+          update_id: 91000002,
+          message: {
+            message_id: 2,
+            date: Math.floor(Date.now() / 1000),
+            from: { id: chatId, is_bot: false, first_name: 'Test' },
+            chat: { id: chatId, type: 'private' },
+            text: '/credits',
+          },
+        });
+
+        expect(creditsReply?.text).toContain('33');
+      });
     });
 
     it('returns instruction guide on /help with verdict explanations', async () => {

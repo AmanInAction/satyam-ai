@@ -86,7 +86,142 @@ export class AppDatabase {
       );
 
       CREATE INDEX IF NOT EXISTS idx_tx_user ON transactions(user_id, created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS telegram_link_codes (
+        code_hash TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        expires_at INTEGER NOT NULL,
+        claimed_by_chat TEXT,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_telegram_link_codes_user
+        ON telegram_link_codes(user_id);
+
+      CREATE TABLE IF NOT EXISTS telegram_accounts (
+        chat_id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        linked_at TEXT NOT NULL
+      );
     `);
+  }
+
+  public createTelegramLinkCode(userId: string, codeHash: string, expiresAt: number): void {
+    const now = new Date().toISOString();
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      this.db.prepare('DELETE FROM telegram_link_codes WHERE expires_at <= ?').run(Date.now());
+      this.db.prepare('DELETE FROM telegram_link_codes WHERE user_id = ?').run(userId);
+      this.db.prepare(`
+        INSERT INTO telegram_link_codes (code_hash, user_id, expires_at, created_at)
+        VALUES (?, ?, ?, ?)
+      `).run(codeHash, userId, expiresAt, now);
+      this.db.exec('COMMIT');
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
+  public claimTelegramLinkCode(
+    codeHash: string,
+    chatId: string
+  ):
+    | { status: 'claimed'; userId: string }
+    | { status: 'already_linked'; userId: string }
+    | { status: 'chat_linked' | 'user_linked' | 'invalid_code' } {
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const codeRows = this.db.prepare(`
+        SELECT user_id, expires_at, claimed_by_chat
+        FROM telegram_link_codes
+        WHERE code_hash = ?
+        LIMIT 1
+      `).all(codeHash) as unknown as Array<{
+        user_id: string;
+        expires_at: number;
+        claimed_by_chat: string | null;
+      }>;
+      const code = codeRows[0];
+      if (!code || code.expires_at <= Date.now() ||
+          (code.claimed_by_chat !== null && code.claimed_by_chat !== chatId)) {
+        this.db.exec('COMMIT');
+        return { status: 'invalid_code' };
+      }
+
+      const chatRows = this.db.prepare(
+        'SELECT user_id FROM telegram_accounts WHERE chat_id = ? LIMIT 1'
+      ).all(chatId) as unknown as Array<{ user_id: string }>;
+      if (chatRows[0]) {
+        this.db.exec('COMMIT');
+        return chatRows[0].user_id === code.user_id
+          ? { status: 'already_linked', userId: code.user_id }
+          : { status: 'chat_linked' };
+      }
+
+      const userRows = this.db.prepare(
+        'SELECT chat_id FROM telegram_accounts WHERE user_id = ? LIMIT 1'
+      ).all(code.user_id) as unknown as Array<{ chat_id: string }>;
+      if (userRows[0]) {
+        this.db.exec('COMMIT');
+        return { status: 'user_linked' };
+      }
+
+      this.db.prepare(`
+        UPDATE telegram_link_codes
+        SET claimed_by_chat = ?
+        WHERE code_hash = ?
+      `).run(chatId, codeHash);
+      this.db.exec('COMMIT');
+      return { status: 'claimed', userId: code.user_id };
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
+  public completeTelegramAccountLink(
+    codeHash: string,
+    chatId: string,
+    userId: string
+  ): boolean {
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const codeRows = this.db.prepare(`
+        SELECT user_id, expires_at, claimed_by_chat
+        FROM telegram_link_codes
+        WHERE code_hash = ?
+        LIMIT 1
+      `).all(codeHash) as unknown as Array<{
+        user_id: string;
+        expires_at: number;
+        claimed_by_chat: string | null;
+      }>;
+      const code = codeRows[0];
+      if (!code || code.user_id !== userId || code.claimed_by_chat !== chatId ||
+          code.expires_at <= Date.now()) {
+        this.db.exec('COMMIT');
+        return false;
+      }
+
+      this.db.prepare(`
+        INSERT INTO telegram_accounts (chat_id, user_id, linked_at)
+        VALUES (?, ?, ?)
+      `).run(chatId, userId, new Date().toISOString());
+      this.db.prepare('DELETE FROM telegram_link_codes WHERE code_hash = ?').run(codeHash);
+      this.db.exec('COMMIT');
+      return true;
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
+  public getTelegramLinkedUserId(chatId: string): string | null {
+    const rows = this.db.prepare(
+      'SELECT user_id FROM telegram_accounts WHERE chat_id = ? LIMIT 1'
+    ).all(chatId) as unknown as Array<{ user_id: string }>;
+    return rows[0]?.user_id || null;
   }
 
   // ----------------------------------------------------

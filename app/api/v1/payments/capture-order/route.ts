@@ -7,10 +7,12 @@ import { getUserIdFromRequest, attachUserSessionHeaders } from '@/src/lib/paymen
 import { defaultRateLimiter } from '@/src/lib/security/rateLimiter';
 import { createErrorResponse, generateRequestId } from '@/src/lib/errors/apiError';
 import { safeLogger } from '@/src/lib/security/logger';
+import { SUPPORTED_PAYMENT_CURRENCIES } from '@/src/lib/payments/types';
 
 const CaptureOrderSchema = z.object({
   orderId: z.string().min(1, 'Order ID is required.'),
   packageId: z.string().min(1, 'Package ID is required.'),
+  currency: z.enum(SUPPORTED_PAYMENT_CURRENCIES).default('USD'),
 });
 
 export async function OPTIONS() {
@@ -57,8 +59,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { orderId, packageId } = parseResult.data;
-  const pkg = getCreditPackageById(packageId);
+  const { orderId, packageId, currency } = parseResult.data;
+  const pkg = getCreditPackageById(packageId, currency);
   if (!pkg) {
     return createErrorResponse(
       404,
@@ -70,7 +72,11 @@ export async function POST(req: NextRequest) {
 
   try {
     // 1. Capture Order via PayPal API
-    const captureData = await defaultPayPalClient.captureOrder(orderId, packageId);
+    const captureData = await defaultPayPalClient.captureOrder(
+      orderId,
+      packageId,
+      currency
+    );
 
     // 2. Verify Capture Status
     if (captureData.status !== 'COMPLETED') {

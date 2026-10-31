@@ -20,6 +20,7 @@ _India's Scam Detection & Viral Claim Verification Bot_
 • Just *forward* any suspicious message or SMS here.
 • Paste a *link/URL* to check for phishing or domain spoofing.
 • Send a forwarded WhatsApp forward to verify its claims.
+• Use \`/link CODE\` to sync checks with your signed-in website account.
 
 📞 *Emergency Helpline:*
 For urgent cyber fraud in India, call *1930* or visit [cybercrime.gov.in](https://cybercrime.gov.in).
@@ -33,6 +34,8 @@ export function formatHelpMessage(): string {
 *Commands:*
 • \`/start\` - Restart bot & overview
 • \`/help\` - Show this help guide
+• \`/credits\` - Check your available credits
+• \`/link CODE\` - Sync credits with your signed-in SatyamAI website account
 
 *Supported Checks:*
 • 📩 *Text Messages:* Bank alerts, job offers, electricity bill warnings, lottery SMS.
@@ -47,6 +50,32 @@ export function formatHelpMessage(): string {
 No detection system can guarantee 100% safety. Always confirm directly with official bank helplines before sharing credentials.
 
 🚨 *Cyber Helpline:* Dial *1930* (Toll-Free, India)`;
+}
+
+export function formatTelegramLinkInstructions(): string {
+  return `To sync website and Telegram credits:
+1. Sign in to your SatyamAI website account and open *Account*.
+2. Generate a one-time Telegram link code.
+3. Send \`/link CODE\` here within 10 minutes.
+
+The code can only be used once. Never share it with anyone else.`;
+}
+
+export function formatTelegramLinkResult(
+  status: 'linked' | 'already_linked' | 'chat_linked' | 'user_linked' | 'invalid_code'
+): string {
+  switch (status) {
+    case 'linked':
+      return `✅ *Account linked.* Your website and Telegram now use the same checks balance. Use \`/credits\` to see your available checks.`;
+    case 'already_linked':
+      return `✅ This Telegram account is already linked to that SatyamAI account. Use \`/credits\` to check your balance.`;
+    case 'chat_linked':
+      return `⚠️ This Telegram account is already linked to a different SatyamAI account. Sign in to the intended website account and contact support if you need to change the link.`;
+    case 'user_linked':
+      return `⚠️ That SatyamAI account is already linked to another Telegram account.`;
+    default:
+      return `❌ That link code is invalid or expired. Generate a new code from your signed-in SatyamAI website account.`;
+  }
 }
 
 export function formatUnsupportedInputMessage(): string {

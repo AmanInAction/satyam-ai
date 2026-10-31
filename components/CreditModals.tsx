@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   X,
   CreditCard,
@@ -13,6 +13,7 @@ import {
   Check,
 } from 'lucide-react';
 import { CreditPackage, CreditTransaction } from '@/src/lib/payments/types';
+import { PaymentCurrency } from '@/src/lib/payments/types';
 
 interface CreditModalsProps {
   isTopUpOpen: boolean;
@@ -22,7 +23,7 @@ interface CreditModalsProps {
   balance: number;
   available: number;
   packages: CreditPackage[];
-  onPurchase: (packageId: string) => Promise<void>;
+  onPurchase: (packageId: string, currency: PaymentCurrency) => Promise<void>;
   isPurchasing: string | null;
   purchaseSuccess: string | null;
   purchaseError: string | null;
@@ -49,6 +50,8 @@ export function CreditModals({
   onRefreshLedger,
   isVerifyingPayment,
 }: CreditModalsProps) {
+  const [currency, setCurrency] = useState<PaymentCurrency>('USD');
+
   if (!isTopUpOpen && !isLedgerOpen) return null;
 
   return (
@@ -88,6 +91,24 @@ export function CreditModals({
               </div>
             </div>
 
+            <div className="mb-5 flex items-center gap-2" role="group" aria-label="Payment currency">
+              {(['USD', 'INR'] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  aria-pressed={currency === option}
+                  onClick={() => setCurrency(option)}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                    currency === option
+                      ? 'border-blue-600 bg-blue-50 text-blue-700'
+                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {option === 'INR' ? 'INR (₹)' : 'USD ($)'}
+                </button>
+              ))}
+            </div>
+
             {/* Feedback Messages */}
             {isVerifyingPayment && (
               <div className="mb-6 p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs flex items-center gap-3">
@@ -112,7 +133,12 @@ export function CreditModals({
 
             {/* Package Cards Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-              {packages.map((pkg) => {
+              {packages.map((packageOption) => {
+                const pkg = {
+                  ...packageOption,
+                  price: packageOption.prices[currency],
+                  currency,
+                };
                 const isSelected = isPurchasing === pkg.id;
                 return (
                   <div
@@ -133,8 +159,10 @@ export function CreditModals({
                       <h4 className="font-bold text-slate-900 text-sm">{pkg.name}</h4>
                       <p className="text-xs text-slate-500 mt-1">{pkg.description}</p>
                       <div className="mt-4 flex items-baseline gap-1">
-                        <span className="text-2xl font-extrabold text-slate-900">${pkg.price}</span>
-                        <span className="text-xs text-slate-500">USD</span>
+                        <span className="text-2xl font-extrabold text-slate-900">
+                          {currency === 'INR' ? '₹' : '$'}{pkg.price}
+                        </span>
+                        <span className="text-xs text-slate-500">{currency}</span>
                       </div>
                       <div className="mt-1 text-xs font-semibold text-emerald-700">
                         +{pkg.credits} Checks
@@ -144,7 +172,7 @@ export function CreditModals({
                     <button
                       type="button"
                       disabled={Boolean(isPurchasing) || Boolean(isVerifyingPayment)}
-                      onClick={() => onPurchase(pkg.id)}
+                      onClick={() => onPurchase(pkg.id, currency)}
                       className={`mt-5 w-full py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition disabled:opacity-50 ${
                         pkg.popular
                           ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'

@@ -36,7 +36,7 @@ import { CreditBar, EssentialSafetyGuidanceCard } from './CreditBar';
 import { CreditModals } from './CreditModals';
 import { AuthModal, UserProfile } from './AuthModal';
 import { HistoryModal } from './HistoryModal';
-import { CreditPackage, CreditTransaction } from '@/src/lib/payments/types';
+import { CreditPackage, CreditTransaction, PaymentCurrency } from '@/src/lib/payments/types';
 
 interface PresetScenario {
   id: string;
@@ -341,7 +341,7 @@ export default function AnalysisDashboard() {
     const paramPackageId = urlParams.get('package_id') || urlParams.get('packageId');
 
     // Retrieve saved pending order from sessionStorage if available
-    let storedPending: { orderId: string; packageId: string } | null = null;
+    let storedPending: { orderId: string; packageId: string; currency?: PaymentCurrency } | null = null;
     try {
       const stored = sessionStorage.getItem('satyamai_pending_paypal');
       if (stored) {
@@ -353,6 +353,8 @@ export default function AnalysisDashboard() {
 
     const effectiveOrderId = token || storedPending?.orderId;
     const effectivePackageId = paramPackageId || storedPending?.packageId || 'plus';
+    const requestedCurrency = storedPending?.currency || urlParams.get('currency');
+    const effectiveCurrency: PaymentCurrency = requestedCurrency === 'INR' ? 'INR' : 'USD';
 
     if (isCancel) {
       try {
@@ -386,6 +388,7 @@ export default function AnalysisDashboard() {
         body: JSON.stringify({
           orderId: effectiveOrderId,
           packageId: effectivePackageId,
+          currency: effectiveCurrency,
         }),
       })
         .then(async (res) => {
@@ -431,20 +434,20 @@ export default function AnalysisDashboard() {
     }
   }, [fetchTransactions]);
 
-  const handlePurchasePackage = async (packageId: string) => {
+  const handlePurchasePackage = async (packageId: string, currency: PaymentCurrency) => {
     setIsPurchasing(packageId);
     setPurchaseError(null);
     setPurchaseSuccess(null);
 
     try {
-      const returnUrl = `${window.location.origin}/analyze?paypal_return=true&package_id=${packageId}`;
-      const cancelUrl = `${window.location.origin}/analyze?paypal_cancel=true&package_id=${packageId}`;
+      const returnUrl = `${window.location.origin}/analyze?paypal_return=true&package_id=${packageId}&currency=${currency}`;
+      const cancelUrl = `${window.location.origin}/analyze?paypal_cancel=true&package_id=${packageId}&currency=${currency}`;
 
       // 1. Create order on server
       const createRes = await fetch('/api/v1/payments/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ packageId, returnUrl, cancelUrl }),
+        body: JSON.stringify({ packageId, currency, returnUrl, cancelUrl }),
       });
       const orderData = await createRes.json();
       if (!createRes.ok) {
@@ -467,6 +470,7 @@ export default function AnalysisDashboard() {
           JSON.stringify({
             orderId: orderData.orderId,
             packageId,
+            currency,
             createdAt: Date.now(),
           })
         );
