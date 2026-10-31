@@ -1,161 +1,176 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import {
   ArrowRight,
-  Bot,
   CheckCircle2,
   Image as ImageIcon,
   Link as LinkIcon,
   MessageSquareText,
-  Shield,
+  PhoneCall,
+  Send,
 } from 'lucide-react';
 import { CREDIT_COSTS, CREDIT_PACKAGES, FREE_INITIAL_CREDITS } from '@/src/lib/payments/config';
 
 export default function Home() {
   const features = [
-    { icon: MessageSquareText, title: 'Message checks', detail: 'Spot scam tactics and assess suspicious claims.', cost: `${CREDIT_COSTS.text} check` },
-    { icon: LinkIcon, title: 'Link inspection', detail: 'Review suspicious URLs for phishing signals.', cost: `${CREDIT_COSTS.url} check` },
-    { icon: ImageIcon, title: 'Screenshot analysis', detail: 'Extract and review text from suspicious screenshots.', cost: `${CREDIT_COSTS.image} checks` },
-    { icon: Bot, title: 'Telegram bot', detail: 'Send a message or link to the bot for a quick safety check.', cost: `${CREDIT_COSTS.text} check` },
+    { icon: MessageSquareText, title: 'Messages & claims', detail: 'Look for pressure tactics, suspicious requests, and claims that need checking.', cost: `${CREDIT_COSTS.text} check` },
+    { icon: LinkIcon, title: 'Website links', detail: 'Inspect a URL for common signs of phishing and misleading websites.', cost: `${CREDIT_COSTS.url} check` },
+    { icon: ImageIcon, title: 'Screenshots', detail: 'Review text in a screenshot without retyping the whole message.', cost: `${CREDIT_COSTS.image} checks` },
+    { icon: Send, title: 'Telegram', detail: 'Forward a message or paste a link in the SatyamAI Telegram bot.', cost: `${CREDIT_COSTS.text} check` },
   ];
 
   return (
-    <main className="min-h-screen">
-      <header className="max-w-6xl mx-auto px-5 sm:px-8 py-5 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-3 rounded-xl focus-visible:ring-2 focus-visible:ring-blue-600 outline-none">
-          <div className="p-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-600">
-            <Shield className="w-6 h-6" />
-          </div>
-          <div className="text-left">
-            <h1 className="font-bold text-xl text-slate-900 tracking-tight">SatyamAI</h1>
-            <p className="text-xs text-slate-600">Scam & misinformation checks</p>
-          </div>
+    <main className="min-h-screen bg-[#f7f6f2] text-[#20251f]">
+      <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8">
+        <Link href="/" className="flex items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-emerald-800">
+          <Image src="/satyam.jpeg" alt="SatyamAI shield" width={48} height={48} className="h-11 w-11 rounded-full object-cover" priority />
+          <span>
+            <span className="block text-lg font-bold tracking-tight">SatyamAI</span>
+            <span className="block text-[11px] text-[#667066]">A clearer second look</span>
+          </span>
         </Link>
-        <Link href="/analyze" className="text-sm font-semibold text-blue-700 hover:text-blue-800 rounded-lg focus-visible:ring-2 focus-visible:ring-blue-600 outline-none">
-          Open checker
+        <nav className="hidden items-center gap-8 text-sm text-[#596158] md:flex" aria-label="Main navigation">
+          <a href="#how-it-works" className="transition hover:text-[#203c30]">How it works</a>
+          <a href="#what-to-check" className="transition hover:text-[#203c30]">What to check</a>
+          <a href="#plans" className="transition hover:text-[#203c30]">Check packs</a>
+        </nav>
+        <Link href="/analyze" className="inline-flex items-center gap-2 rounded-full bg-[#244a38] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#193b2b] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#244a38]">
+          Open checker <ArrowRight className="h-4 w-4" />
         </Link>
       </header>
 
-      <section className="bg-linear-to-br from-blue-50 via-slate-50 to-white border-y border-blue-100">
-        <div className="max-w-6xl mx-auto px-5 sm:px-8 py-16 sm:py-24 grid lg:grid-cols-[1.2fr_0.8fr] gap-12 items-center">
-          <div>
-            <p className="inline-flex items-center gap-2 rounded-full bg-white border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-800">
-              <Shield className="w-3.5 h-3.5" /> Built for everyday online safety
+      <section className="border-y border-[#e5e6de] bg-[#eeefe8]">
+        <div className="mx-auto grid max-w-6xl items-center gap-10 px-5 py-14 sm:px-8 sm:py-20 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="max-w-xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#52715d]">Take a moment. Check before you act.</p>
+            <h1 className="mt-5 font-serif text-5xl leading-[1.08] tracking-tight text-[#202a22] sm:text-6xl">
+              Not sure about that message?
+            </h1>
+            <p className="mt-6 max-w-lg text-base leading-7 text-[#596158] sm:text-lg">
+              Get a straightforward review of suspicious messages, links, screenshots, and viral claims—with signals to look for and sensible next steps.
             </p>
-            <h2 className="mt-5 text-4xl sm:text-5xl font-bold tracking-tight text-slate-950 max-w-xl">
-              Pause before you trust that message.
-            </h2>
-            <p className="mt-5 text-lg leading-8 text-slate-600 max-w-2xl">
-              Check suspicious messages, links, screenshots, and viral claims for scam signals and evidence before you act.
-            </p>
-            <div className="mt-8 flex flex-col sm:flex-row gap-3">
-              <Link href="/analyze" className="inline-flex justify-center items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 shadow-sm focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 outline-none">
-                Check something now <ArrowRight className="w-4 h-4" />
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Link href="/analyze" className="inline-flex items-center justify-center gap-2 rounded-full bg-[#244a38] px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-[#193b2b]">
+                Check a message or link <ArrowRight className="h-4 w-4" />
               </Link>
-              <a href="#plans" className="inline-flex justify-center items-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 outline-none">
-                View check packs
+              <a href="#how-it-works" className="inline-flex items-center justify-center rounded-full border border-[#cfd4ca] bg-[#f7f6f2] px-6 py-3.5 text-sm font-semibold text-[#354139] transition hover:bg-white">
+                How it works
               </a>
             </div>
-            <p className="mt-4 text-xs text-slate-500">New accounts receive {FREE_INITIAL_CREDITS} free checks. SatyamAI is advisory guidance, not a guarantee of safety.</p>
+            <p className="mt-5 text-xs leading-5 text-[#6b746c]">
+              {FREE_INITIAL_CREDITS} free checks for new accounts. Advice is not a guarantee of safety.
+            </p>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-lg shadow-blue-950/5">
-            <p className="text-sm font-semibold text-slate-900">A safer next step, in seconds</p>
-            <div className="mt-5 space-y-4">
-              {['Paste the message or link, or upload a screenshot.', 'Review clear risk signals, evidence, and practical next steps.', 'If money was sent, call India’s Cyber Crime Helpline: 1930.'].map((step, index) => (
-                <div className="flex gap-3" key={step}>
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">{index + 1}</span>
-                  <p className="text-sm leading-6 text-slate-600">{step}</p>
-                </div>
-              ))}
+          <div className="relative mx-auto flex min-h-[310px] w-full max-w-[500px] items-center justify-center overflow-hidden rounded-[2rem] border border-[#dde1d7] bg-[#f8f8f4] p-8 sm:min-h-[390px]">
+            <div className="absolute left-8 top-8 h-24 w-24 rounded-full bg-[#e8ede5]" />
+            <div className="absolute bottom-8 right-7 h-36 w-36 rounded-full bg-[#e8ede5]" />
+            <Image
+              src="/satyam.jpeg"
+              alt="SatyamAI shield emblem"
+              width={360}
+              height={360}
+              className="relative h-56 w-56 rounded-full object-cover sm:h-72 sm:w-72"
+              priority
+            />
+            <div className="absolute bottom-5 left-5 flex items-center gap-3 rounded-2xl border border-[#e5e6de] bg-white px-4 py-3 shadow-sm sm:bottom-7 sm:left-7">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#edf3ec] text-[#365a43]">
+                <PhoneCall className="h-4 w-4" />
+              </span>
+              <span>
+                <span className="block text-[10px] font-medium uppercase tracking-wide text-[#727a70]">India cyber helpline</span>
+                <span className="block text-sm font-bold text-[#28352b]">1930</span>
+              </span>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="max-w-6xl mx-auto px-5 sm:px-8 py-16" aria-labelledby="features-title">
-        <div className="max-w-2xl">
-          <p className="text-sm font-semibold text-blue-700">What you can check</p>
-          <h2 id="features-title" className="mt-2 text-3xl font-bold tracking-tight text-slate-950">One place for the suspicious things people forward.</h2>
+      <section id="how-it-works" className="mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-20">
+        <div className="grid gap-8 border-b border-[#e2e4dc] pb-10 sm:grid-cols-[0.8fr_1.2fr] sm:items-end">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#52715d]">A useful first step</p>
+            <h2 className="mt-3 max-w-md font-serif text-3xl leading-tight tracking-tight sm:text-4xl">Look closer, then decide for yourself.</h2>
+          </div>
+          <p className="max-w-xl text-sm leading-6 text-[#636b62] sm:justify-self-end">
+            SatyamAI helps you review potential warning signs. It explains what stands out, points to available evidence, and suggests what you can do next.
+          </p>
         </div>
-        <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {features.map(({ icon: Icon, title, detail, cost }) => (
-            <article key={title} className="rounded-2xl border border-slate-200 bg-white p-5">
-              <div className="w-fit rounded-xl bg-blue-50 border border-blue-100 p-2.5 text-blue-700"><Icon className="w-5 h-5" /></div>
-              <h3 className="mt-4 font-bold text-slate-900">{title}</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-600">{detail}</p>
-              <p className="mt-4 text-xs font-semibold text-blue-700">{cost}</p>
+        <div className="grid gap-0 sm:grid-cols-3">
+          {[
+            ['01', 'Share what you received', 'Paste a message or link, or upload a screenshot.'],
+            ['02', 'Review the signals', 'See the risk assessment, evidence, and key details.'],
+            ['03', 'Choose a safe next step', 'Verify with official sources. Never share an OTP or UPI PIN.'],
+          ].map(([number, title, detail]) => (
+            <article key={number} className="border-b border-[#e2e4dc] py-6 sm:border-b-0 sm:border-r sm:px-6 sm:first:pl-0 sm:last:border-r-0">
+              <span className="text-xs font-semibold tracking-widest text-[#7c897b]">{number}</span>
+              <h3 className="mt-3 text-base font-semibold">{title}</h3>
+              <p className="mt-2 text-sm leading-6 text-[#687067]">{detail}</p>
             </article>
           ))}
         </div>
       </section>
 
-      <section className="bg-blue-50 border-y border-blue-100" aria-labelledby="telegram-title">
-        <div className="max-w-6xl mx-auto px-5 sm:px-8 py-16 grid lg:grid-cols-[1fr_1fr] gap-10 items-center">
-          <div>
-            <p className="inline-flex items-center gap-2 rounded-full bg-white border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-800">
-              <Bot className="w-3.5 h-3.5" /> Check messages right in Telegram
-            </p>
-            <h2 id="telegram-title" className="mt-4 text-3xl font-bold tracking-tight text-slate-950">
-              A suspicious message? Send it to SatyamAI.
-            </h2>
-            <p className="mt-3 text-base leading-7 text-slate-600">
-              Forward a message or paste a link in the bot chat to get a scam-risk and claim assessment with practical next steps.
-            </p>
-            <a
-              href="https://t.me/satvii_bot"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 shadow-sm focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 outline-none"
-            >
-              Open SatyamAI on Telegram <ArrowRight className="w-4 h-4" />
-            </a>
+      <section id="what-to-check" className="border-y border-[#e5e6de] bg-white">
+        <div className="mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-20">
+          <div className="max-w-xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#52715d]">What you can check</p>
+            <h2 className="mt-3 font-serif text-3xl tracking-tight sm:text-4xl">Everyday messages deserve a second look.</h2>
           </div>
-
-          <div className="rounded-2xl border border-blue-100 bg-white p-6 sm:p-8">
-            <h3 className="font-bold text-slate-900">How to use the bot</h3>
-            <ol className="mt-5 space-y-4">
-              {[
-                <>Open the bot and tap <strong>Start</strong>, or send <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">/start</code>.</>,
-                <>Forward or paste a suspicious message, or send a website link.</>,
-                <>Review the assessment and suggested next steps. Verify important decisions with official sources.</>,
-              ].map((step, index) => (
-                <li className="flex gap-3" key={index}>
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">{index + 1}</span>
-                  <p className="text-sm leading-6 text-slate-600">{step}</p>
-                </li>
-              ))}
-            </ol>
-            <p className="mt-5 text-xs leading-5 text-slate-500">
-              Use <code>/help</code> for instructions and <code>/credits</code> to check your balance. Checks use credits. The bot can’t analyze images yet—paste the text or link shown in a screenshot instead. Results are advisory, not a guarantee of safety.
-            </p>
+          <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {features.map(({ icon: Icon, title, detail, cost }) => (
+              <article key={title} className="rounded-2xl border border-[#e6e8e1] bg-[#fbfbf8] p-5 transition hover:border-[#cbd6ca]">
+                <Icon className="h-5 w-5 text-[#42684e]" strokeWidth={1.7} />
+                <h3 className="mt-5 font-semibold">{title}</h3>
+                <p className="mt-2 min-h-[72px] text-sm leading-6 text-[#687067]">{detail}</p>
+                <p className="mt-4 text-xs font-medium text-[#55705a]">{cost}</p>
+              </article>
+            ))}
+          </div>
+          <div className="mt-10 flex flex-col justify-between gap-5 rounded-2xl bg-[#eff1eb] p-6 sm:flex-row sm:items-center sm:p-8">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#52715d]">Prefer Telegram?</p>
+              <h3 className="mt-2 text-lg font-semibold">Forward a message to SatyamAI.</h3>
+              <p className="mt-1 text-sm text-[#687067]">Paste a link or forward text to get a quick review.</p>
+            </div>
+            <a href="https://t.me/satvii_bot" target="_blank" rel="noopener noreferrer" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-[#cbd4c8] bg-white px-5 py-3 text-sm font-semibold text-[#294a36] transition hover:bg-[#f8faf6]">
+              Open Telegram <ArrowRight className="h-4 w-4" />
+            </a>
           </div>
         </div>
       </section>
 
-      <section id="plans" className="bg-slate-900 text-white py-16">
-        <div className="max-w-6xl mx-auto px-5 sm:px-8">
-          <p className="text-sm font-semibold text-blue-300">Simple check packs</p>
-          <div className="mt-2 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-            <h2 className="text-3xl font-bold tracking-tight">Keep checking when your free checks run out.</h2>
-            <Link href="/analyze" className="text-sm font-semibold text-blue-300 hover:text-white">Buy in the checker <ArrowRight className="inline w-4 h-4" /></Link>
+      <section id="plans" className="bg-[#26382d] text-white">
+        <div className="mx-auto max-w-6xl px-5 py-14 sm:px-8 sm:py-20">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#bdcbbd]">Simple check packs</p>
+              <h2 className="mt-3 max-w-xl font-serif text-3xl leading-tight tracking-tight sm:text-4xl">More checks, whenever you need them.</h2>
+            </div>
+            <Link href="/analyze" className="inline-flex items-center gap-2 text-sm font-semibold text-[#d3dfd1] transition hover:text-white">
+              Buy in the checker <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
-          <div className="mt-8 grid md:grid-cols-3 gap-4">
+          <div className="mt-8 grid gap-3 md:grid-cols-3">
             {CREDIT_PACKAGES.map((pkg) => (
-              <div key={pkg.id} className="rounded-2xl border border-slate-700 bg-slate-800 p-6">
-                <h3 className="font-bold">{pkg.name}</h3>
-                <p className="mt-5 text-3xl font-bold">${pkg.price}<span className="text-sm font-medium text-slate-400"> USD</span></p>
-                <p className="mt-1 text-sm font-semibold text-slate-300">or ₹{pkg.prices.INR} INR</p>
-                <p className="mt-2 text-sm text-slate-300">{pkg.credits} checks; checks never expire.</p>
-                <div className="mt-5 flex items-center gap-2 text-xs text-slate-300"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Pay securely with PayPal</div>
-              </div>
+              <article key={pkg.id} className="rounded-2xl border border-white/15 bg-white/[0.06] p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <h3 className="font-semibold">{pkg.name}</h3>
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-[#b8cdb8]" />
+                </div>
+                <p className="mt-5 text-3xl font-semibold">${pkg.price}<span className="text-sm font-normal text-[#c2ccc3]"> USD</span></p>
+                <p className="mt-1 text-sm text-[#c2ccc3]">or ₹{pkg.prices.INR} INR</p>
+                <p className="mt-4 text-sm text-[#e2e8e0]">{pkg.credits} checks · never expire</p>
+                <p className="mt-4 border-t border-white/15 pt-4 text-xs text-[#c2ccc3]">Pay securely with PayPal</p>
+              </article>
             ))}
           </div>
         </div>
       </section>
 
-      <footer className="max-w-6xl mx-auto px-5 sm:px-8 py-8 flex flex-col sm:flex-row gap-2 justify-between text-xs text-slate-500">
+      <footer className="mx-auto flex max-w-6xl flex-col gap-2 px-5 py-7 text-xs leading-5 text-[#70786f] sm:flex-row sm:justify-between sm:px-8">
         <span>SatyamAI provides advisory safety checks and does not store personal content.</span>
-        <span>National Cyber Crime Helpline: 1930 | cybercrime.gov.in</span>
+        <span>National Cyber Crime Helpline: 1930 · cybercrime.gov.in</span>
       </footer>
     </main>
   );

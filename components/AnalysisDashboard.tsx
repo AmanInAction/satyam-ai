@@ -888,6 +888,14 @@ Helpline (India): 1930 | cybercrime.gov.in`;
 
   return (
     <div className="space-y-6">
+      <div className="pb-1">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#52715d]">Check before you act</p>
+        <h1 className="mt-2 font-serif text-3xl tracking-tight text-[#202a22] sm:text-4xl">What would you like to check?</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-[#687067]">
+          Review a suspicious message, link, or screenshot. We’ll help you spot warning signs and decide what to do next.
+        </p>
+      </div>
+
       {/* Allowance & Checks Bar */}
       <CreditBar
         balance={creditBalance}

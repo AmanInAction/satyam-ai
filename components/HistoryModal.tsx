@@ -115,9 +115,6 @@ export function HistoryModal({ isOpen, onClose, onSelectAnalysis }: HistoryModal
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900">Your Verification History</h3>
-              <p className="text-xs text-slate-500">
-                Persistent records stored securely in your SQLite database
-              </p>
             </div>
           </div>
 

@@ -206,10 +206,6 @@ export function AuthModal({
           /* Sign In / Sign Up Form */
           <div>
             <div className="mb-5">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-semibold mb-2">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>SQLite Persistent Account</span>
-              </div>
               <h3 className="text-xl font-bold text-slate-900">
                 {mode === 'signin' ? 'Sign in to SatyamAI' : 'Create an Account'}
               </h3>

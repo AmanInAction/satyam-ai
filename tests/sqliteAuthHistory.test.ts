@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { AppDatabase } from '../src/lib/db/database';
+import { DatabaseSync } from 'node:sqlite';
+import { AppDatabase, defaultDb } from '../src/lib/db/database';
 import { NextRequest } from 'next/server';
 import { POST as registerHandler } from '../app/api/v1/auth/register/route';
 import { POST as loginHandler } from '../app/api/v1/auth/login/route';
@@ -15,6 +16,46 @@ describe('SQLite Database & Auth Service', () => {
   beforeEach(() => {
     db = new AppDatabase(':memory:');
     defaultCreditLedger.reset();
+  });
+
+  it('adds and backfills persisted credit columns in an existing database', () => {
+    const databasePath = path.join(process.cwd(), `.temp-credit-schema-${Date.now()}.sqlite`);
+    const legacyDb = new DatabaseSync(databasePath);
+    legacyDb.exec(`
+      CREATE TABLE users (
+        id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL,
+        password_salt TEXT NOT NULL, display_name TEXT NOT NULL,
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      CREATE TABLE transactions (
+        id TEXT PRIMARY KEY, user_id TEXT NOT NULL, type TEXT NOT NULL,
+        amount REAL NOT NULL, balance_after REAL NOT NULL, reason TEXT NOT NULL,
+        idempotency_key TEXT UNIQUE, metadata_json TEXT, created_at TEXT NOT NULL
+      );
+      INSERT INTO users VALUES (
+        'usr_legacy', 'legacy@example.com', 'hash', 'salt', 'Legacy',
+        '2025-01-01T00:00:00.000Z', '2025-01-01T00:00:00.000Z'
+      );
+      INSERT INTO transactions VALUES (
+        'tx_grant', 'usr_legacy', 'initial_grant', 3, 3, 'Grant',
+        'grant_legacy', NULL, '2025-01-01T00:00:00.000Z'
+      );
+      INSERT INTO transactions VALUES (
+        'tx_debit', 'usr_legacy', 'analysis_debit', -1, 2, 'Debit',
+        'debit_legacy', NULL, '2025-01-02T00:00:00.000Z'
+      );
+    `);
+    legacyDb.close();
+
+    const migratedDb = new AppDatabase(databasePath);
+    try {
+      const user = migratedDb.findUserById('usr_legacy');
+      expect(user?.credits_available).toBe(2);
+      expect(user?.has_received_free_grant).toBe(1);
+    } finally {
+      migratedDb.close();
+      fs.rmSync(databasePath, { force: true });
+    }
   });
 
   it('creates user with salted password hash and retrieves user by email', () => {
@@ -258,6 +299,49 @@ describe('Auth & History API Route Handlers', () => {
     const goodData = await goodRes.json();
     expect(goodData.success).toBe(true);
     expect(goodData.token).toBeDefined();
+  });
+
+  it('persists account credits and does not re-add anonymous credits on relogin', async () => {
+    const email = `credit_login_${Date.now()}@example.com`;
+    const anonymousUserId = `anon_credit_${Date.now()}`;
+    await defaultCreditLedger.getOrCreateUser(anonymousUserId);
+
+    const registerRes = await registerHandler(
+      new NextRequest('http://localhost:3000/api/v1/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': anonymousUserId,
+        },
+        body: JSON.stringify({ email, password: 'Password123' }),
+      })
+    );
+    const registerData = await registerRes.json();
+    const userId = registerData.user.id as string;
+    expect(registerData.balance).toBe(3);
+    expect(defaultDb.findUserById(userId)?.credits_available).toBe(3);
+
+    const reservation = await defaultCreditLedger.reserveCredits(userId, 1, 'text');
+    await defaultCreditLedger.commitReservation(reservation.reservationId, 'analysis_credit_1');
+    expect(defaultDb.findUserById(userId)?.credits_available).toBe(2);
+
+    const reloginRes = await loginHandler(
+      new NextRequest('http://localhost:3000/api/v1/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': anonymousUserId,
+        },
+        body: JSON.stringify({ email, password: 'Password123' }),
+      })
+    );
+    const reloginData = await reloginRes.json();
+    expect(reloginData.balance).toBe(2);
+    expect(defaultDb.findUserById(userId)?.credits_available).toBe(2);
+
+    const restartedLedger = new CreditLedgerService();
+    expect((await restartedLedger.getBalance(userId)).balance).toBe(2);
+    expect((await restartedLedger.getBalance(anonymousUserId)).balance).toBe(0);
   });
 
   it('retrieves profile via /api/v1/auth/me for authenticated user', async () => {

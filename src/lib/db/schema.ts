@@ -4,6 +4,8 @@ export interface DbUser {
   password_hash: string;
   password_salt: string;
   display_name: string;
+  credits_available: number;
+  has_received_free_grant: number;
   created_at: string;
   updated_at: string;
 }
@@ -46,4 +48,10 @@ export interface DbUserBalance {
   balance: number;
   has_received_free_grant: number;
   updated_at: string;
+}
+
+export interface DbUserCreditState {
+  user_id: string;
+  credits_available: number;
+  has_received_free_grant: number;
 }

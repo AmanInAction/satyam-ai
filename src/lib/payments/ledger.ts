@@ -15,6 +15,7 @@ export class CreditLedgerService {
   private balances: Map<string, number> = new Map(); // userId -> current total balance
   private freeGrantUsers: Set<string> = new Set(); // users who have received initial free grant
   private redeemedOrders: Set<string> = new Set(); // orderId / captureId already credited
+  private migratedAnonymousUsers: Set<string> = new Set();
   private activeReservations: Map<string, CreditReservation> = new Map(); // reservationId -> reservation
   private userMutexes: Map<string, Promise<unknown>> = new Map(); // serialization lock per user
   private journalPath: string | null = null;
@@ -119,6 +120,12 @@ export class CreditLedgerService {
         };
         this.applyTransactionToMemory(tx);
       }
+      for (const state of defaultDb.getAllUserCreditStates()) {
+        this.balances.set(state.user_id, state.credits_available);
+        if (state.has_received_free_grant) {
+          this.freeGrantUsers.add(state.user_id);
+        }
+      }
     } catch (err: unknown) {
       safeLogger.error(`Error loading credit ledger transactions from SQLite: ${(err as Error)?.message}`);
     }
@@ -128,21 +135,17 @@ export class CreditLedgerService {
    * Records a transaction directly into SQLite for ACID durability.
    */
   private appendToJournal(tx: CreditTransaction) {
-    try {
-      defaultDb.recordTransaction({
-        id: tx.id,
-        userId: tx.userId,
-        type: tx.type,
-        amount: tx.amount,
-        balanceAfter: tx.balanceAfter,
-        reason: tx.reason,
-        idempotencyKey: tx.idempotencyKey,
-        metadata: tx.metadata,
-        createdAt: tx.timestamp,
-      });
-    } catch (dbErr: unknown) {
-      safeLogger.warn(`SQLite transaction persistence notice: ${(dbErr as Error)?.message}`);
-    }
+    defaultDb.recordTransaction({
+      id: tx.id,
+      userId: tx.userId,
+      type: tx.type,
+      amount: tx.amount,
+      balanceAfter: tx.balanceAfter,
+      reason: tx.reason,
+      idempotencyKey: tx.idempotencyKey,
+      metadata: tx.metadata,
+      createdAt: tx.timestamp,
+    });
   }
 
   private applyTransactionToMemory(tx: CreditTransaction) {
@@ -190,6 +193,20 @@ export class CreditLedgerService {
    */
   private initUserSync(userId: string): void {
     if (!this.freeGrantUsers.has(userId)) {
+      if (this.migratedAnonymousUsers.has(userId) || defaultDb.hasAnonymousCreditMigration(userId)) {
+        this.migratedAnonymousUsers.add(userId);
+        return;
+      }
+
+      const persistedState = defaultDb.getUserCreditState(userId);
+      if (persistedState) {
+        this.balances.set(userId, persistedState.credits_available);
+        if (persistedState.has_received_free_grant) {
+          this.freeGrantUsers.add(userId);
+          return;
+        }
+      }
+
       const currentBalance = this.balances.get(userId) || 0;
       const newBalance = currentBalance + FREE_INITIAL_CREDITS;
 
@@ -204,8 +221,8 @@ export class CreditLedgerService {
         idempotencyKey: `free_grant_${userId}`,
       };
 
-      this.applyTransactionToMemory(tx);
       this.appendToJournal(tx);
+      this.applyTransactionToMemory(tx);
 
       safeLogger.info(`Granted ${FREE_INITIAL_CREDITS} free credits to user ${userId}`);
     }
@@ -319,9 +336,6 @@ export class CreditLedgerService {
     }
 
     return this.withUserLock(reservation.userId, async () => {
-      reservation.status = 'committed';
-      this.activeReservations.delete(reservationId);
-
       const currentBalance = this.balances.get(reservation.userId) || 0;
       const newBalance = Math.max(0, currentBalance - reservation.amount);
 
@@ -341,8 +355,10 @@ export class CreditLedgerService {
         },
       };
 
-      this.applyTransactionToMemory(tx);
       this.appendToJournal(tx);
+      reservation.status = 'committed';
+      this.activeReservations.delete(reservationId);
+      this.applyTransactionToMemory(tx);
 
       safeLogger.info(
         `Committed debit of ${reservation.amount} credits for user ${reservation.userId}. New balance: ${newBalance}`
@@ -421,8 +437,8 @@ export class CreditLedgerService {
         },
       };
 
-      this.applyTransactionToMemory(tx);
       this.appendToJournal(tx);
+      this.applyTransactionToMemory(tx);
 
       safeLogger.info(
         `Credited ${credits} purchased credits to user ${userId} for PayPal order ${orderId}. New balance: ${newBalance}`
@@ -472,8 +488,8 @@ export class CreditLedgerService {
         },
       };
 
-      this.applyTransactionToMemory(tx);
       this.appendToJournal(tx);
+      this.applyTransactionToMemory(tx);
 
       safeLogger.info(
         `Processed refund reversal of ${actualDeduction} credits for user ${userId}. New balance: ${newBalance}`
@@ -502,37 +518,67 @@ export class CreditLedgerService {
     return this.withUserLock(toUserId, async () => {
       return this.withUserLock(fromUserId, async () => {
         const fromBalance = this.balances.get(fromUserId) || 0;
-        const toBalance = this.balances.get(toUserId) || 0;
+        const alreadyMigrated = this.migratedAnonymousUsers.has(fromUserId) ||
+          defaultDb.hasAnonymousCreditMigration(fromUserId);
 
-        if (fromBalance > 0) {
-          const newBalance = toBalance + fromBalance;
-          this.balances.set(toUserId, newBalance);
-          this.balances.set(fromUserId, 0);
+        if (fromBalance > 0 && !alreadyMigrated) {
+          const targetState = defaultDb.getUserCreditState(toUserId);
+          const targetHasReceivedFreeGrant = this.freeGrantUsers.has(toUserId) ||
+            Boolean(targetState?.has_received_free_grant);
+          const transactions: CreditTransaction[] = [];
 
-          const tx: CreditTransaction = {
-            id: `tx_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
-            userId: toUserId,
-            timestamp: new Date().toISOString(),
-            type: 'initial_grant',
-            amount: fromBalance,
-            balanceAfter: newBalance,
-            reason: `Account link: merged ${fromBalance} credits from anonymous session`,
-            idempotencyKey: `merge_${fromUserId}_to_${toUserId}`,
-            metadata: { mergedFrom: fromUserId },
-          };
-          this.applyTransactionToMemory(tx);
-          this.appendToJournal(tx);
+          if (!targetHasReceivedFreeGrant) {
+            const toBalance = this.balances.get(toUserId) ?? targetState?.credits_available ?? 0;
+            const newBalance = toBalance + fromBalance;
+            const timestamp = new Date().toISOString();
+            transactions.push({
+              id: `tx_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+              userId: fromUserId,
+              timestamp,
+              type: 'administrative_adjustment',
+              amount: -fromBalance,
+              balanceAfter: 0,
+              reason: `Account link: transferred ${fromBalance} credits`,
+              idempotencyKey: `merge_${fromUserId}_to_${toUserId}_debit`,
+              metadata: { mergedTo: toUserId },
+            });
+            transactions.push({
+              id: `tx_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+              userId: toUserId,
+              timestamp,
+              type: 'initial_grant',
+              amount: fromBalance,
+              balanceAfter: newBalance,
+              reason: `Account link: merged ${fromBalance} credits from anonymous session`,
+              idempotencyKey: `merge_${fromUserId}_to_${toUserId}`,
+              metadata: { mergedFrom: fromUserId },
+            });
+          }
+
+          const migrated = defaultDb.recordAnonymousCreditMigration(
+            fromUserId,
+            toUserId,
+            transactions
+          );
+          if (migrated) {
+            this.migratedAnonymousUsers.add(fromUserId);
+            for (const tx of transactions) {
+              this.applyTransactionToMemory(tx);
+            }
+          }
         }
-
-        const fromTxs = this.transactions.get(fromUserId) || [];
-        const toTxs = this.transactions.get(toUserId) || [];
-        this.transactions.set(toUserId, [...toTxs, ...fromTxs]);
-        this.transactions.delete(fromUserId);
 
         try {
           defaultDb.migrateAnonymousData(fromUserId, toUserId);
         } catch {
           // ignore
+        }
+
+        const fromTransactions = this.transactions.get(fromUserId) || [];
+        if (fromTransactions.length > 0) {
+          const toTransactions = this.transactions.get(toUserId) || [];
+          this.transactions.set(toUserId, [...toTransactions, ...fromTransactions]);
+          this.transactions.delete(fromUserId);
         }
 
         return this.computeBalanceResponse(toUserId);
@@ -548,6 +594,7 @@ export class CreditLedgerService {
     this.balances.clear();
     this.freeGrantUsers.clear();
     this.redeemedOrders.clear();
+    this.migratedAnonymousUsers.clear();
     this.activeReservations.clear();
     this.userMutexes.clear();
 

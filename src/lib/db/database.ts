@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { DbUser, DbSession, DbAnalysis, DbTransaction } from './schema';
+import { DbUser, DbSession, DbAnalysis, DbTransaction, DbUserCreditState } from './schema';
 import { safeLogger } from '../security/logger';
 
 export class AppDatabase {
@@ -46,6 +46,8 @@ export class AppDatabase {
         password_hash TEXT NOT NULL,
         password_salt TEXT NOT NULL,
         display_name TEXT NOT NULL,
+        credits_available INTEGER NOT NULL DEFAULT 0,
+        has_received_free_grant INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
@@ -87,6 +89,12 @@ export class AppDatabase {
 
       CREATE INDEX IF NOT EXISTS idx_tx_user ON transactions(user_id, created_at DESC);
 
+      CREATE TABLE IF NOT EXISTS anonymous_credit_migrations (
+        anonymous_user_id TEXT PRIMARY KEY,
+        authenticated_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL
+      );
+
       CREATE TABLE IF NOT EXISTS telegram_link_codes (
         code_hash TEXT PRIMARY KEY,
         user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -104,6 +112,32 @@ export class AppDatabase {
         linked_at TEXT NOT NULL
       );
     `);
+
+    const userColumns = this.db.prepare('PRAGMA table_info(users)').all() as unknown as Array<{
+      name: string;
+    }>;
+    const existingColumns = new Set(userColumns.map((column) => column.name));
+    if (!existingColumns.has('credits_available')) {
+      this.db.exec('ALTER TABLE users ADD COLUMN credits_available INTEGER NOT NULL DEFAULT 0');
+      this.db.exec(`
+        UPDATE users
+        SET credits_available = COALESCE((
+          SELECT balance_after FROM transactions
+          WHERE transactions.user_id = users.id
+          ORDER BY created_at DESC LIMIT 1
+        ), 0)
+      `);
+    }
+    if (!existingColumns.has('has_received_free_grant')) {
+      this.db.exec('ALTER TABLE users ADD COLUMN has_received_free_grant INTEGER NOT NULL DEFAULT 0');
+      this.db.exec(`
+        UPDATE users
+        SET has_received_free_grant = CASE WHEN EXISTS (
+          SELECT 1 FROM transactions
+          WHERE transactions.user_id = users.id AND transactions.type = 'initial_grant'
+        ) THEN 1 ELSE 0 END
+      `);
+    }
   }
 
   public createTelegramLinkCode(userId: string, codeHash: string, expiresAt: number): void {
@@ -256,8 +290,10 @@ export class AppDatabase {
     const name = displayName?.trim() || cleanEmail.split('@')[0] || 'User';
 
     const insert = this.db.prepare(`
-      INSERT INTO users (id, email, password_hash, password_salt, display_name, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO users (
+        id, email, password_hash, password_salt, display_name,
+        credits_available, has_received_free_grant, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?)
     `);
     insert.run(userId, cleanEmail, hash, salt, name, now, now);
 
@@ -267,6 +303,8 @@ export class AppDatabase {
       password_hash: hash,
       password_salt: salt,
       display_name: name,
+      credits_available: 0,
+      has_received_free_grant: 0,
       created_at: now,
       updated_at: now,
     };
@@ -306,6 +344,8 @@ export class AppDatabase {
       SELECT s.token, s.user_id, s.expires_at, s.created_at,
              u.id as u_id, u.email as u_email, u.display_name as u_name,
              u.password_hash as u_hash, u.password_salt as u_salt,
+             u.credits_available as u_credits_available,
+             u.has_received_free_grant as u_has_received_free_grant,
              u.created_at as u_created_at, u.updated_at as u_updated_at
       FROM sessions s
       JOIN users u ON s.user_id = u.id
@@ -327,6 +367,8 @@ export class AppDatabase {
         display_name: row.u_name,
         password_hash: row.u_hash,
         password_salt: row.u_salt,
+        credits_available: row.u_credits_available,
+        has_received_free_grant: row.u_has_received_free_grant,
         created_at: row.u_created_at,
         updated_at: row.u_updated_at,
       },
@@ -460,23 +502,15 @@ export class AppDatabase {
     const now = tx.createdAt || new Date().toISOString();
     const metadataStr = tx.metadata ? JSON.stringify(tx.metadata) : null;
 
-    const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO transactions (
-        id, user_id, type, amount, balance_after, reason, idempotency_key, metadata_json, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    stmt.run(
-      tx.id,
-      tx.userId,
-      tx.type,
-      tx.amount,
-      tx.balanceAfter,
-      tx.reason,
-      tx.idempotencyKey || null,
-      metadataStr,
-      now
-    );
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      this.insertTransaction(tx, metadataStr, now);
+      this.updateUserCreditState(tx.userId, tx.balanceAfter, tx.type === 'initial_grant');
+      this.db.exec('COMMIT');
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
 
     return {
       id: tx.id,
@@ -489,6 +523,107 @@ export class AppDatabase {
       metadata_json: metadataStr,
       created_at: now,
     };
+  }
+
+  private insertTransaction(
+    tx: {
+      id: string;
+      userId: string;
+      type: string;
+      amount: number;
+      balanceAfter: number;
+      reason: string;
+      idempotencyKey?: string;
+    },
+    metadataStr: string | null,
+    createdAt: string
+  ): void {
+    this.db.prepare(`
+      INSERT OR REPLACE INTO transactions (
+        id, user_id, type, amount, balance_after, reason, idempotency_key, metadata_json, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      tx.id,
+      tx.userId,
+      tx.type,
+      tx.amount,
+      tx.balanceAfter,
+      tx.reason,
+      tx.idempotencyKey || null,
+      metadataStr,
+      createdAt
+    );
+  }
+
+  private updateUserCreditState(userId: string, balance: number, receivedFreeGrant: boolean): void {
+    this.db.prepare(`
+      UPDATE users
+      SET credits_available = ?,
+          has_received_free_grant = CASE WHEN ? THEN 1 ELSE has_received_free_grant END,
+          updated_at = ?
+      WHERE id = ?
+    `).run(balance, receivedFreeGrant ? 1 : 0, new Date().toISOString(), userId);
+  }
+
+  public getUserCreditState(userId: string): DbUserCreditState | null {
+    const rows = this.db.prepare(`
+      SELECT id AS user_id, credits_available, has_received_free_grant
+      FROM users WHERE id = ? LIMIT 1
+    `).all(userId) as unknown as DbUserCreditState[];
+    return rows[0] || null;
+  }
+
+  public getAllUserCreditStates(): DbUserCreditState[] {
+    return this.db.prepare(`
+      SELECT id AS user_id, credits_available, has_received_free_grant FROM users
+    `).all() as unknown as DbUserCreditState[];
+  }
+
+  public hasAnonymousCreditMigration(anonymousUserId: string): boolean {
+    const rows = this.db.prepare(`
+      SELECT 1 FROM anonymous_credit_migrations WHERE anonymous_user_id = ? LIMIT 1
+    `).all(anonymousUserId);
+    return rows.length > 0;
+  }
+
+  public recordAnonymousCreditMigration(
+    anonymousUserId: string,
+    authenticatedUserId: string,
+    transactions: Array<{
+      id: string;
+      userId: string;
+      type: string;
+      amount: number;
+      balanceAfter: number;
+      reason: string;
+      idempotencyKey?: string;
+      metadata?: Record<string, unknown>;
+      createdAt?: string;
+    }>
+  ): boolean {
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const result = this.db.prepare(`
+        INSERT OR IGNORE INTO anonymous_credit_migrations (
+          anonymous_user_id, authenticated_user_id, created_at
+        ) VALUES (?, ?, ?)
+      `).run(anonymousUserId, authenticatedUserId, new Date().toISOString());
+      if (result.changes === 0) {
+        this.db.exec('COMMIT');
+        return false;
+      }
+
+      for (const tx of transactions) {
+        const createdAt = tx.createdAt || new Date().toISOString();
+        this.insertTransaction(tx, tx.metadata ? JSON.stringify(tx.metadata) : null, createdAt);
+        this.updateUserCreditState(tx.userId, tx.balanceAfter, tx.type === 'initial_grant');
+      }
+      this.db.exec('COMMIT');
+      return true;
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
   }
 
   public getTransactionsByUser(userId: string, limit: number = 50): DbTransaction[] {
@@ -507,7 +642,11 @@ export class AppDatabase {
   }
 
   public clearAllTransactions(): void {
-    this.db.exec('DELETE FROM transactions;');
+    this.db.exec(`
+      DELETE FROM transactions;
+      DELETE FROM anonymous_credit_migrations;
+      UPDATE users SET credits_available = 0, has_received_free_grant = 0;
+    `);
   }
 
   public getDatabasePath(): string {
@@ -527,11 +666,10 @@ export class AppDatabase {
       `);
       updateAnalyses.run(authenticatedUserId, anonymousUserId);
 
-      // Re-assign transactions
-      const updateTx = this.db.prepare(`
+      const updateTransactions = this.db.prepare(`
         UPDATE transactions SET user_id = ? WHERE user_id = ?
       `);
-      updateTx.run(authenticatedUserId, anonymousUserId);
+      updateTransactions.run(authenticatedUserId, anonymousUserId);
 
       safeLogger.info(`Migrated data from anonymous user ${anonymousUserId} to authenticated user ${authenticatedUserId}`);
     } catch (err: unknown) {

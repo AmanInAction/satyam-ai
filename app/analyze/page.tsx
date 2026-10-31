@@ -1,24 +1,24 @@
 import Link from 'next/link';
-import { Shield, PhoneCall } from 'lucide-react';
+import Image from 'next/image';
+import { PhoneCall } from 'lucide-react';
 import AnalysisDashboard from '../../components/AnalysisDashboard';
 
 export default function AnalyzePage() {
   return (
-    <div className="min-h-screen flex flex-col justify-between p-4 sm:p-8 font-sans max-w-5xl mx-auto w-full">
-      <header className="w-full flex items-center justify-between border-b border-slate-200 pb-5 mb-8">
-        <Link href="/" className="flex items-center gap-3 rounded-xl focus-visible:ring-2 focus-visible:ring-blue-600 outline-none">
-          <div className="p-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-600">
-            <Shield className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="font-bold text-xl text-slate-900 tracking-tight">SatyamAI</h1>
-            <p className="text-xs text-slate-600">Check suspicious messages, links, and screenshots</p>
-          </div>
+    <div className="min-h-screen bg-[#f7f6f2] px-4 py-4 font-sans text-[#20251f] sm:px-8 sm:py-6">
+      <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-6xl flex-col sm:min-h-[calc(100vh-3rem)]">
+      <header className="mb-8 flex w-full items-center justify-between border-b border-[#e2e4dc] pb-4">
+        <Link href="/" className="flex items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[#244a38]">
+          <Image src="/satyam.jpeg" alt="SatyamAI shield" width={48} height={48} className="h-10 w-10 rounded-full object-cover" />
+          <span>
+            <span className="block text-lg font-bold tracking-tight">SatyamAI</span>
+            <span className="block text-[11px] text-[#667066]">A clearer second look</span>
+          </span>
         </Link>
 
-        <div className="hidden sm:flex items-center gap-2 text-slate-600 text-xs font-medium">
-          <PhoneCall className="w-3.5 h-3.5 text-blue-600" />
-          <span>India Cyber Helpline: <strong className="text-slate-900 font-semibold">1930</strong></span>
+        <div className="hidden items-center gap-2 text-xs font-medium text-[#667066] sm:flex">
+          <PhoneCall className="h-3.5 w-3.5 text-[#52715d]" />
+          <span>India Cyber Helpline: <strong className="font-semibold text-[#28352b]">1930</strong></span>
         </div>
       </header>
 
@@ -26,10 +26,11 @@ export default function AnalyzePage() {
         <AnalysisDashboard />
       </main>
 
-      <footer className="w-full text-center text-xs text-slate-500 border-t border-slate-200 pt-6 mt-12 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <footer className="mt-12 flex w-full flex-col items-center justify-between gap-2 border-t border-[#e2e4dc] pt-6 text-center text-xs text-[#70786f] sm:flex-row">
         <span>SatyamAI provides advisory safety checks and does not store personal content.</span>
         <span>National Cyber Crime Helpline: 1930 | cybercrime.gov.in</span>
       </footer>
+      </div>
     </div>
   );
 }
