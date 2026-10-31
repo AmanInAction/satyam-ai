@@ -9,9 +9,6 @@ out/
 .env*
 !.env.example
 
-# Local application data
-.data/
-
 # Build and test output
 dist/
 coverage/
