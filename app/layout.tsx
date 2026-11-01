@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-//@ts-expect-error Next.js handles this side-effect CSS import.
+
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 
