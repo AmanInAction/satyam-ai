@@ -1,4 +1,5 @@
-# SatyamAI — Scam & Misinformation Checker
+<p align="center"><a href="https://satyam-ai-rho.vercel.app"><img src="public/satyam.jpeg" width=200 height=200}></img></a></p>
+## SatyamAI — Scam & Misinformation Checker
 
 [![Next.js 15](https://img.shields.io/badge/Next.js-15%2B-black?style=flat&logo=next.js)](https://nextjs.org/)
 [![TypeScript 5.7](https://img.shields.io/badge/TypeScript-5.7-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
@@ -7,7 +8,7 @@
 [![Vitest](https://img.shields.io/badge/Tests-229_Passed-success?style=flat&logo=vitest)](https://vitest.dev/)
 [![National Cyber Helpline](https://img.shields.io/badge/Helpline-1930-red?style=flat)](https://cybercrime.gov.in)
 
-> **SatyamAI** (सत्यम् AI) is a production-grade, India-aware decision-support platform designed to protect citizens from deceptive messages, phishing links, viral claims, and extortion traps. It uniquely separates **Scam/Fraud Risk** from **Factual Claim Verification**, backed by deterministic heuristic rules, live source citations, and contextual AI reasoning.
+> **SatyamAI** is a production-grade, India-aware decision-support platform designed to protect citizens from deceptive messages, phishing links, viral claims, and extortion traps. It uniquely separates **Scam/Fraud Risk** from **Factual Claim Verification**, backed by deterministic heuristic rules, live source citations, and contextual AI reasoning.
 
 ---
 
