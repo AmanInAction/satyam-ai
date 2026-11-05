@@ -1,4 +1,5 @@
-# SatyamAI — Scam & Misinformation Checker
+<p align="center"><a href="https://satyam-ai-rho.vercel.app"><img src="public/satyam.jpeg" width=200 height=200}></img></a></p>
+## SatyamAI — Scam & Misinformation Checker
 
 [![Next.js 15](https://img.shields.io/badge/Next.js-15%2B-black?style=flat&logo=next.js)](https://nextjs.org/)
 [![TypeScript 5.7](https://img.shields.io/badge/TypeScript-5.7-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
