@@ -224,6 +224,7 @@ export default function AnalysisDashboard() {
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [extractedReviewText, setExtractedReviewText] = useState<string>('');
   const [isEditingExtractedText, setIsEditingExtractedText] = useState(false);
+  const [saveToHistory, setSaveToHistory] = useState(false);
   const [languageHint, setLanguageHint] = useState<'auto' | 'en' | 'hi' | 'hinglish'>('auto');
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<AnalysisResponse | null>(null);
@@ -498,12 +499,15 @@ export default function AnalysisDashboard() {
   };
 
   const handleSelectScreenshotPreset = (preset: ScreenshotPreset) => {
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
     const blob = makePresetPngBlob(preset.mockText);
     const file = new File([blob], `${preset.id}.png`, { type: 'image/png' });
     setSelectedImageFile(file);
     setImagePreviewUrl(URL.createObjectURL(blob));
     setLanguageHint(preset.languageHint);
     setExtractedReviewText(preset.mockText === '[UNREADABLE]' ? '' : preset.mockText);
+    setIsEditingExtractedText(false);
+    setResult(null);
     setErrorMessage(null);
   };
 
@@ -516,9 +520,12 @@ export default function AnalysisDashboard() {
       return;
     }
 
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
     setSelectedImageFile(file);
     setImagePreviewUrl(URL.createObjectURL(file));
     setExtractedReviewText('');
+    setIsEditingExtractedText(false);
+    setResult(null);
     setErrorMessage(null);
   };
 
@@ -598,8 +605,10 @@ Helpline (India): 1930 | cybercrime.gov.in`;
         body: JSON.stringify({
           text: inputText.trim(),
           language_hint: languageHint,
+          save_to_history: saveToHistory,
         }),
       });
+      setSaveToHistory(false);
 
       const data = await response.json();
 
@@ -652,8 +661,10 @@ Helpline (India): 1930 | cybercrime.gov.in`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           url: inputUrl.trim(),
+          save_to_history: saveToHistory,
         }),
       });
+      setSaveToHistory(false);
 
       const data = await response.json();
 
@@ -704,11 +715,13 @@ Helpline (India): 1930 | cybercrime.gov.in`;
       const formData = new FormData();
       formData.append('file', selectedImageFile);
       formData.append('language_hint', languageHint);
+      formData.append('save_to_history', String(saveToHistory));
 
       const response = await fetch('/api/v1/analyze/image', {
         method: 'POST',
         body: formData,
       });
+      setSaveToHistory(false);
 
       const data = await response.json();
 
@@ -763,8 +776,10 @@ Helpline (India): 1930 | cybercrime.gov.in`;
         body: JSON.stringify({
           text: extractedReviewText.trim(),
           language_hint: languageHint,
+          save_to_history: saveToHistory,
         }),
       });
+      setSaveToHistory(false);
 
       const data = await response.json();
 
@@ -976,6 +991,18 @@ Helpline (India): 1930 | cybercrime.gov.in`;
           <span className="text-slate-400 font-normal">· 2 checks</span>
         </button>
       </div>
+
+      <label className="flex items-start gap-2 text-xs text-slate-600">
+        <input
+          type="checkbox"
+          checked={saveToHistory}
+          onChange={(event) => setSaveToHistory(event.target.checked)}
+          className="mt-0.5 accent-[#244a38]"
+        />
+        <span>
+          Save this check to history. This stores the submitted text or link, or extracted screenshot text, until you delete it.
+        </span>
+      </label>
 
       {/* Input Section */}
       <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm">
@@ -1209,6 +1236,7 @@ Helpline (India): 1930 | cybercrime.gov.in`;
                   type="file"
                   accept="image/png,image/jpeg,image/webp"
                   onChange={handleImageFileChange}
+                  disabled={isLoading}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 />
 

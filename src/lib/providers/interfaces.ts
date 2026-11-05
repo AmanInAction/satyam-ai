@@ -7,6 +7,7 @@ import {
   ClaimVerdict,
   AnalysisType,
   VerificationSource,
+  VisualAnalysis,
 } from '../validation/schemas';
 
 export interface LLMAnalysisResult {
@@ -38,8 +39,10 @@ export interface VisionOcrResult {
   extractedText: string;
   confidence?: number;
   status: ProviderStatus;
+  failureCode?: string;
   detectedLanguage?: string;
   isSensitiveContent?: boolean;
+  visualAnalysis?: VisualAnalysis;
 }
 
 export interface ILLMProvider {

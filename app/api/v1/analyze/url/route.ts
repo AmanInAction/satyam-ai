@@ -89,27 +89,28 @@ export async function POST(req: NextRequest) {
       true
     );
 
-    // Save to SQLite database for persistent user history
-    try {
-      await defaultDb.saveAnalysis({
-        id: analysis.analysis_id,
-        userId: creditGuardResult.sessionInfo.userId,
-        inputType: 'url',
-        inputPreview: parseResult.data.url.slice(0, 280),
-        verdict: analysis.classification.scam_risk.verdict,
-        scamRisk: analysis.classification.scam_risk.risk_level,
-        claimVerdict: analysis.classification.claim_verification.verdict,
-        confidenceScore: 0.95,
-        reasonsSummary:
-          analysis.reasons?.map((r) => r.title || r.explanation).slice(0, 2).join('; ') ||
-          'URL reputation and threat analysis completed',
-        fullResult: analysis,
-      });
-    } catch (error) {
-      safeLogger.error('Failed to persist URL analysis history.', {
-        analysisId: analysis.analysis_id,
-        error: error instanceof Error ? error.message : String(error),
-      });
+    if (parseResult.data.save_to_history) {
+      try {
+        await defaultDb.saveAnalysis({
+          id: analysis.analysis_id,
+          userId: creditGuardResult.sessionInfo.userId,
+          inputType: 'url',
+          inputPreview: parseResult.data.url.slice(0, 280),
+          verdict: analysis.classification.scam_risk.verdict,
+          scamRisk: analysis.classification.scam_risk.risk_level,
+          claimVerdict: analysis.classification.claim_verification.verdict,
+          confidenceScore: 0.95,
+          reasonsSummary:
+            analysis.reasons?.map((r) => r.title || r.explanation).slice(0, 2).join('; ') ||
+            'URL reputation and threat analysis completed',
+          fullResult: analysis,
+        });
+      } catch (error) {
+        safeLogger.error('Failed to persist URL analysis history.', {
+          analysisId: analysis.analysis_id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
 
     const response = NextResponse.json({

@@ -113,6 +113,13 @@ describe('Deterministic Scam Rules & Benign Counterexamples', () => {
       expect(res.matchedReasons.some((r) => r.code === 'lottery_prize_scam')).toBe(false);
       expect(res.suggestedVerdict).toBe('no_obvious_risk_found');
     });
+
+    it('detects an advance payment disguised as a cashback reward claim', () => {
+      const scam = 'Your SBI Diwali cashback reward is ready. Pay Rs 50 processing fee to claim your prize.';
+      const res = evaluateDeterministicRules(scam);
+      expect(res.suggestedVerdict).toBe('likely_scam');
+      expect(res.matchedReasons.some((r) => r.code === 'lottery_prize_scam')).toBe(true);
+    });
   });
 
   describe('Rule 8: Malicious APK File / Side-Loading RAT Scam', () => {

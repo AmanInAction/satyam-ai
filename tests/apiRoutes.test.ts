@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST as handleTextAnalyze } from '../app/api/v1/analyze/text/route';
 import { POST as handleUrlAnalyze } from '../app/api/v1/analyze/url/route';
+import { defaultDb } from '../src/lib/db/database';
 
 describe('Route Handlers API Contract', () => {
   it('rejects invalid JSON with standardized error envelope', async () => {
@@ -52,6 +53,37 @@ describe('Route Handlers API Contract', () => {
     expect(data.classification.claim_verification.verdict).toBe('unverified');
     expect(Array.isArray(data.reasons)).toBe(true);
     expect(data.provider_status).toBeDefined();
+  });
+
+  it('persists analysis history only when save_to_history is explicitly enabled', async () => {
+    const saveAnalysis = vi.spyOn(defaultDb, 'saveAnalysis').mockImplementation(() => {
+      throw new Error('Intercepting history write in test');
+    });
+
+    try {
+      const createRequest = (saveToHistory: boolean) =>
+        new NextRequest('http://localhost:3000/api/v1/analyze/text', {
+          method: 'POST',
+          body: JSON.stringify({
+            text: 'Urgent: account suspended. Pay fee now.',
+            save_to_history: saveToHistory,
+          }),
+          headers: {
+            'Content-Type': 'application/json',
+            'X-User-Id': `history-opt-in-${saveToHistory}`,
+          },
+        });
+
+      const withoutOptIn = await handleTextAnalyze(createRequest(false));
+      expect(withoutOptIn.status).toBe(200);
+      expect(saveAnalysis).not.toHaveBeenCalled();
+
+      const withOptIn = await handleTextAnalyze(createRequest(true));
+      expect(withOptIn.status).toBe(200);
+      expect(saveAnalysis).toHaveBeenCalledTimes(1);
+    } finally {
+      saveAnalysis.mockRestore();
+    }
   });
 
   it('rejects invalid protocol in URL analysis', async () => {

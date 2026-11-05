@@ -34,6 +34,26 @@ describe('Phase 5: Screenshot Analysis API Route Handlers (/api/v1/analyze/image
       expect(body.limitations.some((l: string) => l.includes('optical text extraction'))).toBe(true);
     });
 
+    it('does not invent OCR text when the uploaded image has no recognized test text', async () => {
+      const pngBuffer = createTestPng(300, 200);
+      const formData = new FormData();
+      formData.append('file', new Blob([new Uint8Array(pngBuffer)], { type: 'image/png' }));
+
+      const req = new NextRequest('http://localhost:3000/api/v1/analyze/image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const res = await POST(req);
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.extracted_text).toBe('');
+      expect(body.provider_status.vision_ocr).toBe('success');
+      expect(body.classification.scam_risk.verdict).toBe('unverified');
+      expect(body.summary).not.toContain('SBI');
+    });
+
     it('identifies dual threats (fake government scheme with registration fee) in screenshot', async () => {
       const dualText = 'Government announced free laptops under PM Yuva Scheme for students. Pay Rs 200 registration fee via UPI at bit.ly/pm-laptop.';
       const pngBuffer = createTestPng(350, 250, dualText);
@@ -178,6 +198,81 @@ describe('Phase 5: Screenshot Analysis API Route Handlers (/api/v1/analyze/image
       const body = await res.json();
       expect(body.error.code).toBe('FILE_TOO_LARGE');
     });
+  });
+
+  describe('Credential-harvesting image regressions', () => {
+    const cases = [
+      {
+        name: 'SBI-style reward poster requesting a UPI PIN',
+        text: 'SBI reward poster: Share your UPI PIN or OTP to complete the verification and receive the money in your bank account.',
+        shouldBeHighRisk: true,
+      },
+      {
+        name: 'cashback poster requesting an OTP',
+        text: 'Congratulations, your cashback is ready. Send the OTP to receive the cashback in your bank account.',
+        shouldBeHighRisk: true,
+      },
+      {
+        name: 'Hindi reward poster requesting banking credentials',
+        text: 'इनाम पाने के लिए अपना बैंकिंग पासवर्ड और पिन बताएं।',
+        shouldBeHighRisk: true,
+      },
+      {
+        name: 'Hinglish payment verification scam',
+        text: 'Aapka reward credit karne ke liye Rs 10 UPI par pay karein aur OTP bhejein.',
+        shouldBeHighRisk: true,
+      },
+      {
+        name: 'genuine bank notification warning against credential sharing',
+        text: 'SBI: Rs 2,500 credited to your account. Do not share your OTP, UPI PIN or password with anyone. Bank never asks for credentials.',
+        shouldBeHighRisk: false,
+      },
+      {
+        name: 'legitimate payment screenshot',
+        text: 'Payment of Rs 450 successful. Amount debited via UPI and sent to Grocery Store. UPI PIN was used to authorize the payment.',
+        shouldBeHighRisk: false,
+      },
+      {
+        name: 'reward announcement without evidence of fraud',
+        text: 'SBI announces a Diwali reward program for eligible customers. Check the official app for details.',
+        shouldBeHighRisk: false,
+      },
+    ];
+
+    for (const testCase of cases) {
+      it(`analyzes ${testCase.name} through the shared text rules`, async () => {
+        const pngBuffer = createTestPng(400, 220, testCase.text);
+        const formData = new FormData();
+        formData.append('file', new Blob([new Uint8Array(pngBuffer)], { type: 'image/png' }));
+
+        const req = new NextRequest('http://localhost:3000/api/v1/analyze/image', {
+          method: 'POST',
+          body: formData,
+        });
+        const res = await POST(req);
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.extracted_text).toBe(testCase.text);
+        if (testCase.shouldBeHighRisk) {
+          expect(body.classification.scam_risk.verdict).toBe('likely_scam');
+          expect(body.classification.scam_risk.risk_level).toBe('high');
+          expect(body.reasons.some((reason: { code: string }) =>
+            ['upi_receive_pin_trap', 'credential_otp_solicitation'].includes(reason.code)
+          )).toBe(true);
+        } else {
+          expect(body.classification.scam_risk.verdict).not.toBe('likely_scam');
+          expect(body.classification.scam_risk.risk_level).not.toBe('high');
+        }
+
+        if (testCase.name === 'SBI-style reward poster requesting a UPI PIN') {
+          expect(body.classification.claim_verification.verdict).toBe('unverified');
+        }
+        if (testCase.name === 'reward announcement without evidence of fraud') {
+          expect(body.classification.claim_verification.verdict).toBe('unverified');
+        }
+      });
+    }
   });
 
   describe('Regional UX & Readability', () => {

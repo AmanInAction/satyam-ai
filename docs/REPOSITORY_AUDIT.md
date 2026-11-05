@@ -1,274 +1,91 @@
 # Repository Audit Report
 
-**Date:** October 13, 2026  
-**Auditor:** Lead Engineer (AI Studio)  
-**Target Submission Window:** November 13–14, 2026  
-**Repository Source:** AmanInAction/satyam-ai  
-**Status:** Baseline Established — Ready for Phase 1  
+**Audit date:** 2026-11-05
+**Repository:** `AmanInAction/satyam-ai`
+**Scope:** Current source, routes, tests, and product documentation in this checkout
+**Release assessment:** Local implementation is feature-rich and automated checks pass; production readiness is **not established**.
 
----
+## Executive status
 
-## 1. Current Repository Structure and Technology Stack
+Phases 0–10 have corresponding implementation in the repository. Image analysis now uses structured Qwen3 VL 235B output, shares deterministic credential-theft rules with text analysis, and defaults to a 120-second vision request timeout. Timeout and provider failures return sanitized diagnostic codes without logging secrets or image content. The user confirmed successful local screenshot analysis after configuring the timeout. Remaining work is release verification: validate model access and credentials in each deployment environment, verify remote Turso operations, and complete manual/deployment checks.
 
-### Initial State Upon Import
-The initial GitHub repository import contained strictly documentation and specification files:
-- `/SOURCE_OF_TRUTH.md` — Authoritative requirements and architecture constraints
-- `/DEVELOPMENT_ROADMAP.md` — Phased implementation roadmap
-- `/README.md` — Project overview and local development outlines
-- `/docs/API_CONTRACT.md` — Proposed `/api/v1` REST schema and endpoint contract
-- `/docs/TEST_PLAN.md` — Test layers, evaluation fixtures, and release gates
-- `/docs/DECISIONS.md` — Architectural decision records (D-001 through D-005)
+## Current implementation
 
-No application source code, package manifests (`package.json`, `requirements.txt`), test suites, or CI/CD pipelines were present in the initial commit tree. The spreadsheet mentioned in documentation (`scam_checker_architecture.xlsx`) was not included in the repository.
-
-### Established Foundation Stack
-To establish a maintainable, production-grade runtime within the containerized AI Studio hosting environment (Node.js 22 runtime, port 3000):
-- **Framework & Runtime:** Next.js 15 (App Router) on Node.js 22 (x64 Linux), npm 10.9.8.
-- **Backend / API Layer:** Next.js Route Handlers (`app/api/v1/*`) with Zod runtime schema validation.
-- **Frontend Layer:** React 19 with Tailwind CSS v4, Server Components by default.
-- **Process Orchestration:** Unified Next.js process (`node scripts/dev.mjs`) listening on `0.0.0.0:3000`.
-- **Environment Management:** `.env.example` committed with required placeholder keys; `.dev.env.json` provides runtime environment variables server-side.
-- **Test Framework:** Vitest 3 with 19 passing unit and contract tests in `tests/`.
-
-### Directory Layout
-```text
-.
-├── DEVELOPMENT_ROADMAP.md
-├── README.md
-├── SOURCE_OF_TRUTH.md
-├── app/
-│   ├── api/v1/
-│   │   ├── analyze/
-│   │   │   ├── text/route.ts
-│   │   │   └── url/route.ts
-│   │   └── health/route.ts
-│   ├── globals.css
-│   ├── layout.tsx
-│   ├── not-found.tsx
-│   └── page.tsx
-├── docs/
-│   ├── API_CONTRACT.md
-│   ├── DECISIONS.md
-│   ├── REPOSITORY_AUDIT.md
-│   └── TEST_PLAN.md
-├── metadata.json
-├── next.config.mjs
-├── package.json
-├── postcss.config.mjs
-├── scripts/
-│   └── dev.mjs
-├── src/
-│   └── lib/
-│       ├── analysis/
-│       │   └── orchestrator.ts
-│       ├── errors/
-│       │   └── apiError.ts
-│       ├── providers/
-│       │   ├── interfaces.ts
-│       │   └── mockAdapter.ts
-│       └── validation/
-│           └── schemas.ts
-├── tests/
-│   ├── apiRoutes.test.ts
-│   ├── health.test.ts
-│   ├── orchestrator.test.ts
-│   └── validation.test.ts
-├── tsconfig.json
-├── vitest.config.ts
-└── .env.example
-```
-
----
-
-## 2. Existing Functionality with Relevant File Paths
-
-| Component / Feature | File Path | Status | Details |
-|---|---|---|---|
-| **Health Check API** | `app/api/v1/health/route.ts` | Active | Returns `{ status: 'ok', service: 'satyam-ai', version: 'v1', timestamp: ... }`. Non-sensitive. |
-| **Text Analysis API** | `app/api/v1/analyze/text/route.ts` | Active | Accepts JSON, validates via Zod, returns dual classification with error envelope. |
-| **URL Analysis API** | `app/api/v1/analyze/url/route.ts` | Active | Accepts URL, validates protocol, port, and SSRF restrictions; executes passive reputation lookups. |
-| **Deterministic Rules Engine** | `src/lib/analysis/deterministicRules.ts` | Active | India-focused rules: UPI PIN traps, OTP solicitation, KYC/power cuts, digital arrest, job/lottery scams, predatory loans, APK RAT scams, Devanagari Hindi text matching with benign counterexamples. |
-| **Bedrock LLM Adapter** | `src/lib/providers/bedrockAdapter.ts` | Active | `@aws-sdk/client-bedrock-runtime` adapter with structured output parsing, sandbox tag sanitization, validation, and unconfigured fallback. |
-| **URL Security & SSRF Engine** | `src/lib/security/urlSecurity.ts` | Active | Safe URL normalization, suspicious indicator detection (TLD, brand spoofing, IP hosts), and strict SSRF blocking (private IPv4/IPv6, loopback, link-local, cloud metadata, unsafe ports). |
-| **Real Evidence Providers** | `src/lib/providers/evidenceProvider.ts` | Active | `WikipediaEvidenceProvider` (live keyless encyclopedic retrieval) and `GoogleFactCheckProvider` behind `IEvidenceProvider`. |
-| **Real Reputation Providers** | `src/lib/providers/reputationProvider.ts` | Active | `CloudflareDnsReputationProvider` (live 1.1.1.2 DoH sinkhole feed) and `GoogleSafeBrowsingProvider` behind `IReputationProvider`. |
-| **Runtime Validation** | `src/lib/validation/schemas.ts` | Active | Zod schemas enforcing bounds (max 10,000 chars, valid URLs), dual verdicts, and contract compliance. |
-| **Error Handling** | `src/lib/errors/apiError.ts` | Active | Standardized error envelope `{ error: { code, message, request_id } }`. |
-| **Provider Adapters** | `src/lib/providers/interfaces.ts`, `mockAdapter.ts`, `bedrockAdapter.ts` | Active | Modular interfaces and composite fallback adapters. |
-| **Claim Extractor & Evaluator** | `src/lib/analysis/claimExtractor.ts`, `evidenceEvaluator.ts` | Active | Classifies analysis types (`scam_risk`, `factual_claim`, `both`, `insufficient_information`), extracts factual assertions, scores evidence relevance, filters irrelevant citations, and enforces grounded verdict discipline. |
-| **Image Security & Dimension Guard** | `src/lib/security/imageSecurity.ts` | Active | Enforces 5MB size limit, container magic byte signatures (PNG, JPEG, WebP), binary dimension parsing (50x50 to 8000x8000 px), and sensitive credential detection (CVV, 16-digit card numbers, passwords). |
-| **Vision OCR Adapters** | `src/lib/providers/visionProvider.ts` | Active | `BedrockVisionProvider` (Claude 3 Haiku vision via `@aws-sdk/client-bedrock-runtime`), `MockVisionOcrProvider`, and `CompositeVisionProvider` for robust fallback. |
-| **Screenshot Analysis Endpoint** | `app/api/v1/analyze/image/route.ts` | Active | Accepts `multipart/form-data` and `application/json` base64 uploads, validates security controls, extracts text, and evaluates through the dual orchestrator pipeline. |
-| **Analysis Orchestrator** | `src/lib/analysis/orchestrator.ts` | Active | Fuses deterministic safety rules with LLM inference, reputation feed, evidence retrieval, provider status, claim extraction/verification, screenshot analysis, and partial-result resilience. |
-| **Interactive Frontend UI** | `components/AnalysisDashboard.tsx`, `app/page.tsx` | Active | Responsive tri-tab (Text, URL, Screenshot) analysis dashboard with dual-verdict cards, detected analysis type, extracted claim badge, OCR preview/refinement editor, sample presets, evidence cards, copy report, and 1930 helpline guidance. |
-| **Automated Test Suite** | `tests/*.test.ts`, `vitest.config.ts` | Active | 135 passing unit, route, orchestrator, evidence, reputation, SSRF, claim verification, rules, image security, vision provider, and screenshot API route tests across 13 suites. |
-| **Build & Lint Scripts** | `package.json`, `next.config.mjs` | Active | `npm run lint` (`tsc --noEmit`), `npm test`, and `npm run build` (`next build`) pass cleanly. |
-
----
-
-## 3. Requirements Comparison (Implemented vs Partial vs Missing)
-
-### P0 & P1 Requirements
-| Requirement | Status | Gap / Notes |
+| Area | Evidence in this checkout | Status and caveat |
 |---|---|---|
-| Responsive web application UI | Implemented | Interactive Next.js dashboard with dual verdict display (`scam_risk` and `claim_verification`), analysis type badge, extracted claim callout, Text, URL, and Screenshot inspection tabs, presets, OCR review & refinement, evidence citation cards, and mobile responsiveness. |
-| Text / message analysis endpoint | Implemented | `app/api/v1/analyze/text/route.ts` active, accepts JSON, validates via Zod, returns dual classification. |
-| URL analysis endpoint | Implemented | `app/api/v1/analyze/url/route.ts` active, enforces SSRF and protocol constraints, runs reputation lookups, returns dual classification. |
-| Screenshot / OCR analysis endpoint | Implemented | `app/api/v1/analyze/image/route.ts` active, accepts multipart form data and base64 JSON, validates MIME, magic bytes, dimensions, extracts OCR text, provides sensitive data warning, and feeds to orchestrator. |
-| Structured API response (dual verdict, reasons, evidence, actions) | Implemented | `src/lib/validation/schemas.ts` defines `classification.scam_risk` and `classification.claim_verification`, verified by contract tests. |
-| Deterministic scam-pattern checks | Implemented | `src/lib/analysis/deterministicRules.ts` with 22 automated positive/benign unit tests covering 11 India-specific patterns and Devanagari script. |
-| LLM provider adapter | Implemented | `BedrockLLMProvider` (`@aws-sdk/client-bedrock-runtime`) and `MockLLMProvider` active; structured output validation verified. |
-| Evidence retrieval integration | Implemented | `WikipediaEvidenceProvider` active (live attributable encyclopedic search); `GoogleFactCheckProvider` configured with graceful fallback. |
-| URL reputation check integration | Implemented | `CloudflareDnsReputationProvider` active (live DoH 1.1.1.2 threat feed); `GoogleSafeBrowsingProvider` configured with graceful fallback. |
-| Unified scam + claim assessment | Implemented | `claimExtractor.ts` and `evidenceEvaluator.ts` identify analysis type, extract factual propositions, score relevance, and enforce verdict discipline (`supported`, `contradicted`, `mixed`, `unverified`). |
-| Hindi / Hinglish input support | Implemented | Evaluated across rules, UI presets, and localized summary generation (`language_hint` support in English, Hindi, Hinglish, Devanagari script regexes). |
-| Input validation & size limits | Implemented | Zod schemas enforce 10,000 char maximum, 2,048 char URL limits, 5MB image file limit, and opaque request IDs. |
-| SSRF and URL safe-fetch protections | Implemented | `src/lib/security/urlSecurity.ts` strictly blocks loopback, private IPs (10/8, 172.16/12, 192.168/16), cloud metadata (169.254.169.254, metadata.google.internal), unsafe ports; server-side target page fetching prohibited. |
-| Automated tests & test fixtures | Implemented | Vitest test runner active with 135 unit, route, orchestrator, evidence, reputation, SSRF, claim verification, rules, image security, and vision tests passing across 13 suites. |
+| Web application | Next.js App Router, React, TypeScript, Tailwind | Implemented |
+| Analysis | Text, URL, and image routes; deterministic rules; claim extraction; evidence evaluation; dual verdicts | Implemented; automated coverage passes |
+| LLM | Amazon Bedrock adapter; mock provider selected only by automated tests | Production credentials and live model configuration not checked |
+| Evidence | Wikipedia search and optional Google Fact Check adapter | Implemented; current live availability/quality not verified by this audit |
+| URL reputation | Cloudflare DNS reputation adapter and optional Google Safe Browsing adapter | Implemented; current live availability not verified |
+| Image OCR and visual analysis | Qwen3 VL 235B Bedrock vision adapter; structured output; shared deterministic rules; 120-second configurable timeout | Local screenshot analysis confirmed working by user; deployed model access/configuration remains unverified; no mock text is substituted in production |
+| Auth and history | Scrypt passwords, sessions, SQLite locally, Turso adapter, history search/deletion | Implemented; remote Turso deployment/migration not verified |
+| Credits and payments | Credit reservation/ledger, PayPal Orders integration and webhook handlers | Implemented; when credentials are absent, PayPal code supports simulated orders. Real sandbox checkout/webhook not verified |
+| Telegram | Webhook, shared analysis path, account-link code | Implemented; production bot/webhook setup not verified |
+| Tests | 20 Vitest files | `npm test`: 247 tests passed on 2026-11-05; `npm run lint` passed |
 
-### P1 & P2 Deferred Requirements
-- User feedback submission: Not started (Phase 8).
-- Safe caching with TTL: Not started (Phase 8).
-- Telegram bot, browser extension, reverse-image search, custom model training, complex user accounts: Deferred per `SOURCE_OF_TRUTH.md` (§4).
+## Phase status
 
-### P2 / Stretch Requirements (Explicitly Deferred)
-- Telegram bot, browser extension, reverse-image search, custom model training, complex user accounts: Deferred per `SOURCE_OF_TRUTH.md` (§4).
+| Roadmap phase | Current assessment |
+|---|---|
+| 0 — Repository and requirement audit | Re-audited on 2026-11-04 |
+| 1 — API contract and analysis skeleton | Implemented |
+| 2 — Reliable text-analysis MVP | Implemented |
+| 3 — URL analysis and evidence retrieval | Implemented; live provider configuration remains environment-dependent |
+| 4 — Unified scam + misinformation assessment | Implemented |
+| 5 — Screenshot input and regional UX | Implemented; actual OCR depends on Bedrock configuration |
+| 6 — Security, privacy, reliability, UX | Core controls/tests implemented; production/manual verification remains open |
+| 7 — Evaluation and release candidate | Evaluation dataset/tests implemented; release-candidate checks remain open |
+| 8 — Telegram Bot MVP | Implemented; live webhook setup remains open |
+| 9 — PayPal sandbox and credit monetization | Implemented; configured sandbox end-to-end verification remains open |
+| 10 — SQLite auth and scan history | Implemented; remote Turso migration/operation remains open |
+| 11 — Production readiness and release sign-off | Remaining; see `DEVELOPMENT_ROADMAP.md` |
 
----
+## Verification performed in this audit
 
-## 4. Architectural Inconsistencies and Complexity Analysis
+Commands were run from the repository root on 2026-11-04:
 
-1. **Dual-Runtime Language Spec vs Single-Process Hosting:**
-   - *Original Specification:* `README.md` and `SOURCE_OF_TRUTH.md` proposed Next.js (frontend) + Python FastAPI (backend).
-   - *Environment Reality:* AI Studio hosts containerized Node.js 22 applications with a single web entry point on port 3000. Running a separate Python FastAPI server alongside Next.js requires multiple processes, internal port routing, or subprocess management, adding fragile orchestration overhead for a solo developer.
-   - *Resolution (Decision D-006):* Implement a unified TypeScript full-stack architecture using Express (`server.ts`) for backend API routes (`/api/v1/*`) and Vite + React 19 for the frontend. This maintains all architectural mandates: clear modularity, thin provider adapters, strict schema validation, versioned REST endpoints, zero secrets in the client bundle, and simple maintainability for a solo engineer.
+| Command | Result |
+|---|---|
+| `npm test` | **PASS** — 20 files, 234 tests |
+| `npm run lint` | **PASS** — `tsc --noEmit` |
+| `npm run build` | **PASS** — Next.js production build completed |
 
-2. **Absence of Initial Source Code:**
-   - The repository was imported as documentation only. Rather than treating this as an error, we treat the specifications as the canonical blueprint and construct the vertical slices methodically.
+The Next.js build warned that it inferred `C:\Users\Asus` as the workspace root because a parent `package-lock.json` and the repository lockfile both exist. This audit did not change workspace configuration. Keep lint and build sequential; concurrent runs previously produced missing generated `.next/types` errors.
 
----
+No live deployment, live third-party provider call, PayPal transaction, Telegram exchange, Turso migration, browser/device test, or manual accessibility review was performed for this audit. No `.env` values were inspected. `.env.example` documents supported configuration names and model defaults; it does not prove a service is configured.
 
-## 5. Security, Privacy, Reliability, and Testing Gaps
+## Requirement and documentation gaps
 
-1. **Untrusted Input Protection:**
-   - User submissions must never be treated as system prompts. Strict prompt-injection delimiters and separation between user data and model instructions must be implemented in the LLM adapter.
-2. **SSRF Guardrails:**
-   - When URL analysis is implemented, target URLs must never be fetched blindly from the server. Reputation lookups and evidence search will be prioritized; direct fetches must enforce private/loopback IP blocks, DNS resolution validation, and protocol restrictions (`SOURCE_OF_TRUTH.md` §8).
-3. **Data Retention & Privacy:**
-   - No raw user messages or URLs may be logged or persisted by default (Decision D-003). Redacted server-side logging must be added in Phase 1.
-4. **Resilience & Partial Results:**
-   - Provider failures (LLM quota, search timeout, reputation API downtime) must not produce unhandled 500 errors. The verdict engine must return structured partial results with explicit provider status (`API_CONTRACT.md` §150).
-5. **Testing Framework:**
-   - A lightweight test runner (Vitest or Node test runner) must be configured in Phase 1 to execute unit tests for deterministic rules and contract validation.
+### Privacy and saved analyses
 
----
+The analysis routes now call `saveAnalysis` only when `save_to_history` is explicitly enabled. The database stores an input preview and complete result; image results may include extracted text. Opted-in history remains until the user deletes it; there is no automatic expiry.
 
-## 6. External Services, Credentials, and Account Requirements
+The UI presents a per-check opt-in that is unchecked by default and discloses what is stored. Local persistence behavior is covered by route tests; remote database deletion and retention behavior still require deployment verification.
 
-| Service / Provider | Purpose | Status in Environment | Action / Fallback |
-|---|---|---|---|
-| **Amazon Bedrock** (Chosen LLM Platform, D-008) | Multi-model LLM reasoning & structured extraction | Unconfigured in container (`AWS_*` credentials needed in deployment) | Adapter pattern implemented (`ILLMProvider`); deterministic `MockLLMProvider` active for local execution and test suites. |
-| **Google Gemini API** (Alternative LLM Provider) | LLM analysis, contextual reasoning, summarization | Available in server environment (`GEMINI_API_KEY`) | Adapter pattern implemented; can be invoked server-side when configured. |
-| **Google Fact Check Tools API** | Evidence retrieval for claims | Optional / Unconfigured | `IEvidenceProvider` adapter reports `provider_status: "not_configured"`; returns `evidence: []` with explicit limitation. |
-| **Web Search (Tavily / Brave / Google Search)** | Evidence retrieval for fresh scam patterns | Optional / Unconfigured | Adapter pattern fallback returns empty evidence list without fabricating sources. |
-| **URL Reputation (Google Safe Browsing / VirusTotal)** | Domain reputation and threat indicators | Optional / Unconfigured | `IReputationProvider` adapter reports `provider_status: "not_configured"` without claiming destination is safe. |
+### Deployment, providers, and transactions
 
-*Note: All integrations operate strictly behind the adapter pattern (Decision D-002) with robust fallback behavior. No development or testing is blocked by missing optional credentials.*
+- Production behavior depends on environment settings. Bedrock, Google Fact Check, Google Safe Browsing, vision/OCR, Telegram, PayPal, and Turso must each be checked in the actual target environment. Missing vision OCR credentials now produce an explicit unverified result; fabricated OCR fallback is removed.
+- PayPal simulation is useful for tests/local flows but is not a real sandbox purchase. Do not equate simulated order/capture success with verified PayPal integration.
+- Turso code and migration scripts exist, but the live database, backup, migration, access policy, and remote deletion behavior were not exercised here.
+- Telegram route tests do not establish that a bot is registered to the production webhook.
+- Unit/integration tests are not browser E2E, manual accessibility, or deployment smoke tests.
 
----
+## Documentation reconciliation
 
-## 7. Dependency, Build, and Deployment Issues Discovered
+- `SOURCE_OF_TRUTH.md` is authoritative for intended requirements and documents the current opt-in history behavior and no-expiry policy.
+- `DEVELOPMENT_ROADMAP.md` records Phases 0–10 as implemented and Phase 11 as the remaining release-readiness phase. It also names intentionally deferred features.
+- `docs/API_CONTRACT.md`, `docs/TEST_PLAN.md`, `docs/DECISIONS.md`, and `README.md` should describe current routes, data handling, provider fallbacks, and unverified production setup—not repeat historical test totals or imply that local tests prove live operation.
+- Previous audit material that described Express/Vite, FastAPI, Gemini configuration, and the original documentation-only repository is superseded and should not be used as current-state evidence.
 
-- **Lockfiles:** Found and removed an obsolete `bun.lock` to comply with npm-only environment requirements.
-- **Node & npm Compatibility:** Running on Node.js v22.23.2 and npm 10.9.8. All installed packages (`react`, `react-dom`, `express`, `tailwindcss`, `vite`, `tsx`, `typescript`) resolved and installed cleanly with zero vulnerability alerts or peer dependency conflicts.
-- **Build Verification:** `npm run lint` (`tsc --noEmit`) and `npm run build` (`tsc && vite build`) execute cleanly with zero errors. Production assets are emitted to `dist/`.
-- **Runtime Dev Server:** Running on port 3000 with live health check returning `200 OK`.
+## Deferred backlog
 
----
+The following are intentionally not required for the current release: browser extension, reverse-image search, deepfake/advanced media forensics, social/community features, admin portal, custom model training, optional feedback capture, safe caching absent a demonstrated need, and microservices/additional infrastructure absent a demonstrated operational need. Screenshot analysis, Telegram, accounts, history, credits, PayPal integration, and Turso support are implemented features—not deferred work.
 
-## 8. Risks and Blockers for November 13–14 Hackathon Submission
+## Recommended next actions
 
-1. **Solo Developer Bandwidth:**
-   - Risk: Over-investing in complex optional features (Telegram bot, screenshot OCR) before the primary P0 text and URL analysis flow is rock-solid.
-   - Mitigation: Adhere strictly to the P0 delivery checklist. Only start P1/P2 after all P0 acceptance gates are green.
-2. **False Certainty / Hallucinated Evidence:**
-   - Risk: LLM claiming a message is "100% verified" or hallucinating a citation URL.
-   - Mitigation: Enforce deterministic guardrails, structured JSON output validation, and explicitly disallow placeholder or fabricated evidence URLs.
-3. **External Provider Flakiness:**
-   - Risk: Third-party APIs timing out during evaluation or live demo.
-   - Mitigation: Rigorous partial-result handling; offline mock fixtures for reproducible testing and demos.
-
----
-
-## 9. Recommended Implementation Order
-
-1. **Phase 1 (Target: October 15–16):**
-   - Setup Vitest test runner.
-   - Implement versioned `/api/v1` routes: `/api/v1/health`, `/api/v1/analyze/text`, `/api/v1/analyze/url`.
-   - Implement typed TypeScript models matching `API_CONTRACT.md`.
-   - Implement modular skeleton: Route Handlers -> Analysis Orchestrator -> Provider Adapters (LLM, Evidence, Reputation).
-   - Implement input validation, size limits, and safe error responses.
-   - Add unit tests for contract validation and provider fallbacks.
-
-2. **Phase 2 (Target: October 17–20):**
-   - Implement deterministic text rules (urgency, credential phishing, fake banking, OTP requests).
-   - Implement Gemini LLM adapter with structured JSON schema output and safe prompt delimiters.
-   - Build responsive React UI: input area, analysis progress state, structured verdict card, reasons list, recommended actions, and limitations.
-   - Connect frontend to `/api/v1/analyze/text`.
-
-3. **Phase 3 (Target: October 21–23):**
-   - Implement safe URL parser and deterministic heuristics (typosquatting, suspicious TLDs, IP hosts).
-   - Implement evidence and reputation adapters with partial-result fallback.
-   - Connect frontend to `/api/v1/analyze/url` and display evidence cards.
-
-4. **Phases 4–7:**
-   - Multilingual testing (Hindi/Hinglish), security hardening, deployment verification, and submission packaging.
-
----
-
-## 10. Architecture Migration Addendum: Full-Stack Next.js App Router
-
-**Executed:** October 13, 2026  
-**Status:** Successfully Migrated & Verified  
-**Decision Reference:** ADR D-007
-
-### Migration Summary
-Following explicit project owner approval, the application was transitioned from React + Vite + Express to a unified, full-stack Next.js App Router architecture:
-1. **App Router Core:** Created `app/layout.tsx` (with metadata synced to `metadata.json`), `app/page.tsx` (preserving the verified dashboard UI), `app/globals.css`, and `app/not-found.tsx`.
-2. **API Route Handlers:** Moved Express endpoints to Next.js Route Handlers:
-   - `GET /api/v1/health` (`app/api/v1/health/route.ts`)
-   - `POST /api/v1/analyze/text` (`app/api/v1/analyze/text/route.ts`)
-   - `POST /api/v1/analyze/url` (`app/api/v1/analyze/url/route.ts`)
-3. **Runtime Schema Validation:** Integrated Zod (`src/lib/validation/schemas.ts`) enforcing input bounds (10,000 max characters for text, valid http/https URLs) and strict response contracts.
-4. **Standard Error Envelopes:** Implemented `src/lib/errors/apiError.ts` generating standardized, safe JSON error shapes with opaque request IDs (`req_*`).
-5. **Modular Architecture:** Created `src/lib/providers/interfaces.ts`, `src/lib/providers/mockAdapter.ts`, and `src/lib/analysis/orchestrator.ts` establishing clear boundaries between route handling, analysis orchestration, deterministic checks, and server-side provider adapters.
-6. **Environment Compatibility Wrapper:** Identified that AI Studio's control plane passes `--host 0.0.0.0` to `npm run dev`, which Next.js CLI rejects in favor of `-H 0.0.0.0`. Authored `scripts/dev.mjs` to seamlessly translate options, guaranteeing 100% runtime compatibility with the platform.
-7. **Automated Test Suite:** Configured Vitest (`vitest.config.ts`), authoring 19 automated unit and contract tests in `tests/` covering health metadata, validation boundaries, orchestrator heuristics, and route handler error responses.
-8. **Verification:**
-   - `npm run lint` (`tsc --noEmit`): **PASS** (0 errors)
-   - `npm test` (`vitest run`): **PASS** (4 test files, 19 tests passing)
-   - `npm run build` (`next build`): **PASS** (compiled in 13.5s, standalone assets emitted)
-   - `GET /api/v1/health`: **HTTP 200 OK**
-   - `POST /api/v1/analyze/text`: **HTTP 200 OK**
-   - `POST /api/v1/analyze/url`: **HTTP 200 OK**
-   - UI Rendering: **Verified** on `http://localhost:3000/`
-
----
-
-## 11. Addendum: Phase 9 (Monetization Engine) & Phase 10 (SQLite Native Auth & History)
-
-**Executed:** October 23, 2026  
-**Status:** Successfully Implemented & Verified  
-**Decision References:** ADR D-017, ADR D-018
-
-### Architecture Enhancements:
-1. **Node 22 Native SQLite (`src/lib/db/database.ts`):** Zero-dependency ACID database in WAL mode (`users`, `sessions`, `analyses`, `transactions`).
-2. **Salted Scrypt User Authentication (`app/api/v1/auth/*`):** `crypto.scryptSync` password hashing, constant-time `crypto.timingSafeEqual` comparison, 30-day session tokens, and automatic anonymous guest data migration.
-3. **Persistent Scan History (`app/api/v1/history`):** Real-time analysis persistence, keyword search, pagination, and user-controlled deletion adhering to Privacy by Default.
-4. **Two-Phase Credit Guard & Monetization (`src/lib/payments/*`):** Two-phase credit reservation (`res_xxx`), idempotent append-only credit ledger (`.data/credit_ledger.jsonl`), and PayPal sandbox checkout and capture.
-5. **Quality & Test Metrics:**
-   - `npm run lint` (`tsc --noEmit`): **PASS** (0 errors)
-   - `npm run test` (`vitest run`): **PASS** (19 test files, 218 tests passing with 100% pass rate)
-   - `npm run build` (`next build`): **PASS** (Production compiled successfully)
-
-
+1. Verify opt-in history saving and deletion against the deployed database; the UI discloses that saved records do not expire automatically.
+2. Deploy to the intended environment; verify configured provider statuses and run health/analysis/security smoke checks.
+3. Exercise real PayPal sandbox and Telegram paths only if in scope; clearly separate simulation from live integration.
+4. Apply/migrate the Turso schema with a reviewed backup and verify history/credit behavior remotely.
+5. Complete manual mobile/desktop, keyboard, accessibility, and recovery checks; record evidence and accepted limitations.

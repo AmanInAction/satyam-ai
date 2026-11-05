@@ -17,15 +17,11 @@ import {
   VisionOcrResult,
   ReputationResult,
 } from '../providers/interfaces';
-import {
-  MockLLMProvider,
-  MockEvidenceProvider,
-  MockReputationProvider,
-} from '../providers/mockAdapter';
+import { MockLLMProvider } from '../providers/mockAdapter';
 import { BedrockLLMProvider } from '../providers/bedrockAdapter';
 import { CompositeEvidenceProvider } from '../providers/evidenceProvider';
 import { CompositeReputationProvider } from '../providers/reputationProvider';
-import { CompositeVisionProvider } from '../providers/visionProvider';
+import { CompositeVisionProvider, MockVisionOcrProvider } from '../providers/visionProvider';
 import {
   validateAndNormalizeUrl,
   evaluateDeterministicUrlSignals,
@@ -39,7 +35,6 @@ import { ApiError } from '../errors/apiError';
 import { evaluateDeterministicRules } from './deterministicRules';
 import {
   identifyAnalysisTypeAndClaim,
-  extractClaimKeywords,
 } from './claimExtractor';
 import {
   filterAndScoreEvidence,
@@ -64,16 +59,19 @@ export class AnalysisOrchestrator {
       this.llm = options.llmProvider;
     } else {
       const bedrock = new BedrockLLMProvider();
-      // If Bedrock credentials are provided in the environment, use Bedrock; in vitest automated suites, default to MockLLMProvider to prevent remote timeouts
-      const useBedrock = !process.env.VITEST && bedrock.isConfigured();
-      this.llm = useBedrock ? bedrock : new MockLLMProvider();
+      this.llm = process.env.VITEST ? new MockLLMProvider() : bedrock;
     }
     this.evidence = options.evidenceProvider ?? new CompositeEvidenceProvider();
     this.reputation = options.reputationProvider ?? new CompositeReputationProvider();
-    this.vision = options.visionProvider ?? new CompositeVisionProvider();
+    this.vision = options.visionProvider ??
+      (process.env.VITEST ? new MockVisionOcrProvider() : new CompositeVisionProvider());
   }
 
-  async analyzeText(text: string, languageHint: string = 'auto'): Promise<AnalysisResponse> {
+  async analyzeText(
+    text: string,
+    languageHint: string = 'auto',
+    visualRiskContext: string[] = []
+  ): Promise<AnalysisResponse> {
     const analysisId = `an_${crypto.randomBytes(8).toString('hex')}`;
     const checksPerformed: string[] = ['claim_extractor', 'deterministic_rules', this.llm.name];
     const providerStatus: Record<string, ProviderStatus> = {};
@@ -82,9 +80,9 @@ export class AnalysisOrchestrator {
     const claimAnalysis = identifyAnalysisTypeAndClaim(text);
 
     // 2. Evaluate India-relevant deterministic scam rules
-    const ruleResult = evaluateDeterministicRules(text);
+    const ruleResult = evaluateDeterministicRules(text, visualRiskContext);
 
-    // 3. Attempt evidence lookup if factual claim or high-profile entity exists
+    // 3. Search external evidence only for an extracted factual claim.
     let evidenceList: AnalysisResponse['evidence'] = [];
     let claimEvaluation = evaluateClaimFromEvidence(
       claimAnalysis.extractedClaim,
@@ -92,22 +90,26 @@ export class AnalysisOrchestrator {
       claimAnalysis.hasFactualAssertion
     );
 
-    try {
-      const queryToSearch = claimAnalysis.searchQuery || text.slice(0, 100);
-      const evResult = await this.evidence.searchEvidence(queryToSearch);
-      providerStatus.evidence = evResult.status;
-      checksPerformed.push(this.evidence.name);
+    if (claimAnalysis.hasFactualAssertion && claimAnalysis.extractedClaim) {
+      try {
+        const queryToSearch = claimAnalysis.searchQuery || claimAnalysis.extractedClaim;
+        const evResult = await this.evidence.searchEvidence(queryToSearch);
+        providerStatus.evidence = evResult.status;
+        checksPerformed.push(this.evidence.name);
 
-      if (evResult.evidence.length > 0) {
-        claimEvaluation = evaluateClaimFromEvidence(
-          claimAnalysis.extractedClaim,
-          evResult.evidence,
-          claimAnalysis.hasFactualAssertion
-        );
-        evidenceList = claimEvaluation.relevantEvidence;
+        if (evResult.evidence.length > 0) {
+          claimEvaluation = evaluateClaimFromEvidence(
+            claimAnalysis.extractedClaim,
+            evResult.evidence,
+            true
+          );
+          evidenceList = claimEvaluation.relevantEvidence;
+        }
+      } catch {
+        providerStatus.evidence = 'unavailable';
       }
-    } catch {
-      providerStatus.evidence = 'unavailable';
+    } else {
+      providerStatus.evidence = 'not_applicable';
     }
 
     providerStatus.url_reputation = 'not_applicable';
@@ -486,25 +488,62 @@ export class AnalysisOrchestrator {
     }
 
     const rawExtracted = ocrResult.extractedText?.trim() || '';
+    const visualAnalysis = ocrResult.visualAnalysis;
+    const hasConfidentVisualRiskIndicators =
+      Boolean(visualAnalysis && visualAnalysis.confidence >= 0.75) &&
+      Boolean(
+        visualAnalysis &&
+          (visualAnalysis.credential_requests.length > 0 ||
+            visualAnalysis.payment_instructions.length > 0 ||
+            visualAnalysis.suspicious_indicators.length > 0 ||
+            visualAnalysis.impersonation_indicators.length > 0 ||
+            visualAnalysis.urgency_indicators.length > 0)
+      );
+    const visualRiskContext =
+      visualAnalysis && visualAnalysis.confidence >= 0.75
+        ? [
+            visualAnalysis.claimed_organization,
+            visualAnalysis.claimed_offer_or_reward,
+            visualAnalysis.requested_user_action,
+            ...visualAnalysis.credential_requests.map(
+              (request) => `The image requests that the viewer disclose or enter: ${request}`
+            ),
+            ...visualAnalysis.payment_instructions,
+            ...visualAnalysis.suspicious_indicators,
+            ...visualAnalysis.impersonation_indicators,
+            ...visualAnalysis.urgency_indicators,
+          ].filter((value): value is string => Boolean(value))
+        : [];
 
     // 3. Handle unreadable, blank, or zero-text images gracefully without crash or safe-verdict hallucination
-    if (!rawExtracted || rawExtracted === '[NO_READABLE_TEXT]') {
+    if ((!rawExtracted || rawExtracted === '[NO_READABLE_TEXT]') && !hasConfidentVisualRiskIndicators) {
+      const ocrUnavailable = ['not_configured', 'unavailable', 'failed'].includes(ocrResult.status);
       const isHindi = languageHint === 'hi';
       const unreadableSummary = isHindi
-        ? 'अपलोड किए गए स्क्रीनशॉट से कोई पढ़ने योग्य या स्पष्ट टेक्स्ट नहीं मिला। कृपया स्पष्ट और अनक्रॉप्ड इमेज अपलोड करें।'
-        : 'No legible or verifiable text was detected in the submitted screenshot.';
+        ? ocrUnavailable
+          ? 'स्क्रीनशॉट OCR सेवा अभी उपलब्ध नहीं है। टेक्स्ट का विश्लेषण नहीं किया गया।'
+          : 'अपलोड किए गए स्क्रीनशॉट से कोई पढ़ने योग्य या स्पष्ट टेक्स्ट नहीं मिला। कृपया स्पष्ट और अनक्रॉप्ड इमेज अपलोड करें।'
+        : ocrUnavailable
+          ? 'Screenshot text extraction is unavailable, so no image text was analyzed.'
+          : 'No legible or verifiable text was detected in the submitted screenshot.';
 
       const unreadableActions = [
-        'Ensure the screenshot is clear, well-lit, and not cropped or blurry.',
-        'If the message contains text, consider typing or pasting the key text directly into the text analyzer.',
+        ...(ocrUnavailable
+          ? ['Try again later or paste the screenshot text into the text analyzer.']
+          : [
+              'Ensure the screenshot is clear, well-lit, and not cropped or blurry.',
+              'If the message contains text, consider typing or pasting the key text directly into the text analyzer.',
+            ]),
       ];
       if (isHindi) {
         unreadableActions.push('कृपया जांचें कि इमेज में टेक्स्ट धुंधला या कटा हुआ न हो।');
       }
 
       const unreadableLimitations = [
-        'Optical Character Recognition (OCR) did not detect any legible text in this image.',
-        'Unreadable images cannot be verified and are evaluated as unverified / unknown risk.',
+        ocrUnavailable
+          ? `OCR provider status: ${ocrResult.status}${ocrResult.failureCode ? ` (${ocrResult.failureCode})` : ''}. No text was extracted or analyzed.`
+          : 'Optical Character Recognition (OCR) did not detect any legible text in this image.',
+        'Images without extracted text cannot be verified and are evaluated as unverified / unknown risk.',
         'This system does not inspect non-textual image features, steganography, or deepfakes.',
       ];
 
@@ -514,6 +553,7 @@ export class AnalysisOrchestrator {
         analysis_type: 'insufficient_information',
         extracted_claim: null,
         extracted_text: '',
+        visual_analysis: ocrResult.visualAnalysis,
         classification: {
           analysis_type: 'insufficient_information',
           scam_risk: {
@@ -531,9 +571,11 @@ export class AnalysisOrchestrator {
         summary: unreadableSummary,
         reasons: [
           {
-            code: 'ocr_unreadable_content',
-            title: 'Unreadable or Blank Image',
-            explanation: 'No readable textual propositions, URLs, or sender cues were detected in the uploaded screenshot.',
+            code: ocrUnavailable ? 'ocr_provider_unavailable' : 'ocr_unreadable_content',
+            title: ocrUnavailable ? 'Screenshot Text Extraction Unavailable' : 'Unreadable or Blank Image',
+            explanation: ocrUnavailable
+              ? `The OCR provider could not extract text (${ocrResult.failureCode || ocrResult.status}), so the screenshot content was not evaluated. Check Bedrock credentials, model access, region, and request permissions.`
+              : 'No readable textual propositions, URLs, or sender cues were detected in the uploaded screenshot.',
             signal_type: 'vision_ocr',
             evidence_refs: [],
           },
@@ -556,12 +598,12 @@ export class AnalysisOrchestrator {
     const sensitiveCheck = checkSensitiveImageCues(rawExtracted);
 
     // 5. Feed extracted text through standard analysis orchestrator pipeline
-    const textAnalysis = await this.analyzeText(rawExtracted, languageHint);
+    const textAnalysis = await this.analyzeText(rawExtracted, languageHint, visualRiskContext);
 
     // 6. Enrich with image-specific metadata, limitations, and security provenance
     const imageLimitations = [
       ...textAnalysis.limitations,
-      'Image analysis is based strictly on optical text extraction; this system cannot verify screenshot authenticity, detect tampering/photoshop, or authenticate digital receipts.',
+      'Image analysis uses optical text extraction and model-generated visual indicators; this system cannot verify screenshot authenticity, detect tampering/photoshop, or authenticate digital receipts.',
     ];
 
     const imageActions = [...textAnalysis.recommended_actions];
@@ -583,6 +625,7 @@ export class AnalysisOrchestrator {
       analysis_id: analysisId,
       input_type: 'image',
       extracted_text: rawExtracted,
+      visual_analysis: visualAnalysis,
       limitations: imageLimitations,
       recommended_actions: imageActions,
       checks_performed: mergedChecks,

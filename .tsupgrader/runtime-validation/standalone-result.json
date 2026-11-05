@@ -1,0 +1,121 @@
+{
+  "planHash": "267b170ea76af0497a73135aca469adee3654a6f4b138a5966c5b4bf3d234973",
+  "phase": "standalone",
+  "recordedAtUtc": "2026-11-05T04:59:36.9345614Z",
+  "retryCount": 0,
+  "resetBaseline": false,
+  "complete": true,
+  "result": {
+    "setupSucceeded": true,
+    "setupDurationMs": 0,
+    "setupFailureOutput": null,
+    "assertions": [
+      {
+        "name": "typescript-typecheck",
+        "kind": "process",
+        "verificationMethod": "exit-code",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "npm notice run satyam-ai@0.1.0 lint\r\nnpm notice run tsc --noEmit\r\n",
+        "durationMs": 7109
+      },
+      {
+        "name": "tests-pass",
+        "kind": "process",
+        "verificationMethod": "test-results",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "npm notice run satyam-ai@0.1.0 test\r\nnpm notice run vitest run\r\n\u001B[33m(!) Your Vite config uses features that are unsupported by \u0060configLoader: \u0027native\u0027\u0060, which is planned to become the default in a future major version of Vite:\r\n  - \u0060__dirname\u0060 (vitest.config.ts:11:25). Use \u0060import.meta.dirname\u0060 instead\r\nSet \u0060VITE_CONFIG_NATIVE_IGNORE_WARNING=true\u0060 to suppress this warning.\u001B[39m\r\n\r\n RUN  v4.1.12 C:/Users/Asus/satyam-ai\r\n\r\n\r\n Test Files  20 passed (20)\r\n      Tests  235 passed (235)\r\n   Start at  10:28:26\r\n   Duration  13.79s (transform 2.48s, setup 0ms, import 11.23s, tests 25.86s, environment 5ms)\r\n\r\n",
+        "durationMs": 15769,
+        "testResults": {
+          "testFramework": "vitest",
+          "runnerDetectedFrom": "package_json",
+          "testsTotal": 235,
+          "testsPassed": 235,
+          "testsFailed": 0,
+          "testsSkipped": 0,
+          "parseFailed": false
+        }
+      },
+      {
+        "name": "production-build",
+        "kind": "process",
+        "verificationMethod": "exit-code",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "npm notice run satyam-ai@0.1.0 build\r\nnpm notice run next build\r\n \u26A0 Warning: Next.js inferred your workspace root, but it may not be correct.\r\n We detected multiple lockfiles and selected the directory of C:\\Users\\Asus\\package-lock.json as the root directory.\r\n To silence this warning, set \u0060outputFileTracingRoot\u0060 in your Next.js config, or consider removing one of the lockfiles if it\u0027s not needed.\r\n   See https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats for more information.\r\n Detected additional lockfiles: \r\n   * C:\\Users\\Asus\\satyam-ai\\package-lock.json\r\n\r\n   \u25B2 Next.js 15.5.28\r\n   - Environments: .env.local, .env\r\n\r\n   Creating an optimized production build ...\r\n \u2713 Compiled successfully in 7.6s\r\n   Linting and checking validity of types ...\r\n   Collecting page data ...\r\n   Generating static pages (0/21) ...\r\n   Generating static pages (5/21) \r\n   Generating static pages (10/21) \r\n   Generating static pages (15/21) \r\n \u2713 Generating static pages (21/21)\r\n   Finalizing page optimization ...\r\n   Collecting build traces ...\r\n\r\nRoute (app)                                 Size  First Load JS\r\n\u250C \u25CB /                                      183 B         113 kB\r\n\u251C \u25CB /_not-found                            163 B         103 kB\r\n\u251C \u25CB /analyze                             20.2 kB         133 kB\r\n\u251C \u0192 /api/v1/analyze/image                  163 B         103 kB\r\n\u251C \u0192 /api/v1/analyze/text                   163 B         103 kB\r\n\u251C \u0192 /api/v1/analyze/url                    163 B         103 kB\r\n\u251C \u0192 /api/v1/auth/login                     163 B         103 kB\r\n\u251C \u0192 /api/v1/auth/logout                    163 B         103 kB\r\n\u251C \u0192 /api/v1/auth/me                        163 B         103 kB\r\n\u251C \u0192 /api/v1/auth/register                  163 B         103 kB\r\n\u251C \u0192 /api/v1/health                         163 B         103 kB\r\n\u251C \u0192 /api/v1/history                        163 B         103 kB\r\n\u251C \u0192 /api/v1/payments/capture-order         163 B         103 kB\r\n\u251C \u0192 /api/v1/payments/create-order          163 B         103 kB\r\n\u251C \u0192 /api/v1/payments/credits               163 B         103 kB\r\n\u251C \u0192 /api/v1/payments/transactions          163 B         103 kB\r\n\u251C \u0192 /api/v1/payments/webhook               163 B         103 kB\r\n\u251C \u0192 /api/v1/telegram/link-code             163 B         103 kB\r\n\u2514 \u0192 /api/v1/telegram/webhook               163 B         103 kB\r\n\u002B First Load JS shared by all             103 kB\r\n  \u251C chunks/255-b1e2483a7e02feee.js       46.6 kB\r\n  \u251C chunks/4bd1b696-c023c6e3521b1417.js  54.2 kB\r\n  \u2514 other shared chunks (total)          1.97 kB\r\n\r\n\r\n\u25CB  (Static)   prerendered as static content\r\n\u0192  (Dynamic)  server-rendered on demand\r\n\r\n",
+        "durationMs": 54502
+      },
+      {
+        "name": "analyze-page-serves",
+        "kind": "http-probe",
+        "verificationMethod": "http-status",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": null,
+        "outputSample": "HTTP 200\n\u003C!DOCTYPE html\u003E\u003C!--NatBQiRlyKDUupnYL1F0a--\u003E\u003Chtml lang=\u0022en\u0022\u003E\u003Chead\u003E\u003Cmeta charSet=\u0022utf-8\u0022/\u003E\u003Cmeta name=\u0022viewport\u0022 content=\u0022width=device-width, initial-scale=1\u0022/\u003E\u003Clink rel=\u0022stylesheet\u0022 href=\u0022/_next/static/css/61aee63b8caba492.css\u0022 data-precedence=\u0022next\u0022/\u003E\u003Clink rel=\u0022preload\u0022 as=\u0022script\u0022 fetchPriority=\u0022low\u0022 href=\u0022/_next/static/chunks/webpack-d00aad840162d325.js\u0022/\u003E\u003Cscript src=\u0022/_next/static/chunks/4bd1b696-c023c6e3521b1417.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/255-b1e2483a7e02feee.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/main-app-7677d2d6627c8905.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/619-ba102abea3e3d0e4.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/923-6c1151f2ad9dd627.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/927-5322a2aa28585a2f.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/app/analyze/page-7f1194af1f029a9b.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Cscript src=\u0022/_next/static/chunks/app/layout-e399df553c6b4da1.js\u0022 async=\u0022\u0022\u003E\u003C/script\u003E\u003Ctitle\u003ESatyam AI - Scam \u0026amp; Misinformation Checker\u003C/title\u003E\u003Cmeta name=\u0022description\u0022 content=\u0022Decision-support web application to evaluate suspicious messages, claims, and URLs with transparent evidence and risk breakdown.\u0022/\u003E\u003Cmeta property=\u0022og:title\u0022 content=\u0022Satyam AI - Scam \u0026amp; Misinformation Checker\u0022/\u003E\u003Cmeta property=\u0022og:description\u0022 content=\u0022Decision-support web application to evaluate suspicious messages, claims, and URLs with transparent evidence and risk breakdown.\u0022/\u003E\u003Cmeta property=\u0022og:type\u0022 content=\u0022website\u0022/\u003E\u003Cmeta name=\u0022twitter:card\u0022 content=\u0022summary\u0022/\u003E\u003Cmeta name=\u0022twitter:title\u0022 content=\u0022Satyam AI - Scam \u0026amp; Misinformation Checker\u0022/\u003E\u003Cmeta name=\u0022twitter:description\u0022 content=\u0022Decision-support web application to evaluate suspicious messages, claims, and URLs with transparent evidence and risk breakdown.\u0022/\u003E\u003Clink rel=\u0022icon\u0022 href=\u0022data:image/svg\u002Bxml,\u0026lt;svg xmlns=\u0026#x27;http://www.w3.org/2000/svg\u0026#x27; viewBox=\u0026#x27;0 0 24 24\u0026#x27; fill=\u0026#x27;none\u0026#x27; stroke=\u0026#x27;%232563eb\u0026#x27; stroke-width=\u0026#x27;2\u0026#x27; stroke-linecap=\u0026#x27;round\u0026#x27; stroke-linejoin=\u0026#x27;round\u0026#x27;\u0026gt;\u0026lt;path d=\u0026#x27;M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z\u0026#x27;/\u0026gt;\u0026lt;/svg\u0026gt;\u0022/\u003E\u003Cscript src=\u0022/_next/static/chunks/polyfills-42372ed130431b0a.js\u0022 noModule=\u0022\u0022\u003E\u003C/script\u003E\u003C/head\u003E\u003Cbody class=\u0022bg-slate-50 text-slate-900 min-h-screen antialiased selection:bg-blue-600 selection:text-white\u0022\u003E\u003Cdiv hidden=\u0022\u0022\u003E\u003C!--$--\u003E\u003C!--/$--\u003E\u003C/div\u003E\u003Cdiv class=\u0022min-h-screen bg-[#f7f6f2] px-4 py-4 font-sans text-[#20251f] sm:px-8 sm:py-6\u0022\u003E\u003Cdiv class=\u0022mx-auto flex min-h-[calc(100vh-2rem)] max-w-6xl flex-col sm:min-h-[calc(100vh-3rem)]\u0022\u003E\u003Cheader class=\u0022mb-8 flex w-full items-center justify-between border-b border-[#e2e4dc] pb-4\u0022\u003E\u003Ca class=\u0022flex items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[#244a38]\u0022 href=\u0022/\u0022\u003E\u003Cimg alt=\u0022SatyamAI shield\u0022 loading=\u0022lazy\u0022 width=\u002248\u0022 height=\u002248\u0022 decoding=\u0022async\u0022 data-nimg=\u00221\u0022 class=\u0022h-10 w-10 rounded-full object-cover\u0022 style=\u0022color:transparent\u0022 srcSet=\u0022/_next/image?url=%2Fsatyam.jpeg\u0026amp;w=48\u0026amp;q=75 1x, /_next/image?url=%2Fsatyam.jpeg\u0026amp;w=96\u0026amp;q=75 2x\u0022 src=\u0022/_next/image?url=%2Fsatyam.jpeg\u0026amp;w=96\u0026amp;q=75\u0022/\u003E\u003Cspan\u003E\u003Cspan class=\u0022block text-lg font-bold tracking-tight\u0022\u003ESatyamAI\u003C/span\u003E\u003Cspan class=\u0022block text-[11px] text-[#667066]\u0022\u003EA clearer second look\u003C/span\u003E\u003C/span\u003E\u003C/a\u003E\u003Cdiv class=\u0022hidden items-center gap-2 text-xs font-medium text-[#667066] sm:flex\u0022\u003E\u003Csvg xmlns=\u0022http://www.w3.org/2000/svg\u0022 width=\u002224\u0022 height=\u002224\u0022 viewBox=\u00220 0 24 24\u0022 fill=\u0022none\u0022 stroke=\u0022currentColor\u0022 stroke-width=\u00222\u0022 stroke-linecap=\u0022round\u0022 stroke-linejoin=\u0022round\u0022 class=\u0022lucide lucide-phone-call h-3.5 w-3.5 text-[#52715d]\u0022 aria-hidden=\u0022true\u0022\u003E\u003Cpath d=\u0022M13 2a9 9 0 0 1 9 9\u0022\u003E\u003C/path\u003E\u003Cpath d=\u0022M13 6a5 5 0 0 1 5 5\u0022\u003E\u003C/path\u003E\u003Cpath d=\u0022M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384\u0022\u003E\u003C/path\u003E\u003C/svg\u003E\u003Cspan\u003EIndia Cyber Helpline: \u003Cstrong class=\u0022font-semibold text-[#28352b]\u0022\u003E1930\u003C/strong\u003E\u003C/span\u003E\u003C/div\u003E\u003C/heade\n\u2026[truncated]",
+        "durationMs": 2142
+      }
+    ],
+    "executions": [
+      {
+        "source": "typescript-typecheck",
+        "resolvedExecutable": "C:\\Users\\Asus\\AppData\\Local\\Author Software\\nvm\\.nodejs\\npm.EXE",
+        "args": [
+          "run",
+          "lint"
+        ],
+        "cwd": "C:\\Users\\Asus\\satyam-ai",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "tests-pass",
+        "resolvedExecutable": "C:\\Users\\Asus\\AppData\\Local\\Author Software\\nvm\\.nodejs\\npm.EXE",
+        "args": [
+          "test"
+        ],
+        "cwd": "C:\\Users\\Asus\\satyam-ai",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "production-build",
+        "resolvedExecutable": "C:\\Users\\Asus\\AppData\\Local\\Author Software\\nvm\\.nodejs\\npm.EXE",
+        "args": [
+          "run",
+          "build"
+        ],
+        "cwd": "C:\\Users\\Asus\\satyam-ai",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "analyze-page-serves",
+        "resolvedExecutable": "C:\\Users\\Asus\\AppData\\Local\\Author Software\\nvm\\.nodejs\\npm.EXE",
+        "args": [
+          "run",
+          "start"
+        ],
+        "cwd": "C:\\Users\\Asus\\satyam-ai",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      }
+    ]
+  }
+}

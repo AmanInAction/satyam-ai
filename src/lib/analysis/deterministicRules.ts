@@ -32,21 +32,21 @@ export const DETERMINISTIC_SCAM_RULES: ScamRule[] = [
       'Never enter your UPI PIN or scan a QR code to receive money. UPI PIN is only required to send or deduct money.',
     evaluate: (_text, lower) => {
       const mentionsUpi = /upi|gpay|google pay|phonepe|paytm|bhim/i.test(lower);
-      const mentionsPin = /pin|upi pin|password/i.test(lower);
+      const mentionsPin = /\bpin\b|upi pin|पासवर्ड|पिन/i.test(lower);
       const claimsReceiving =
-        /to receive|to accept|to get money|to credit|for refund|receive payment|paisa pane ke liye|cashback pane|receive cashback/i.test(
+        /to receive|receive(?: the)? (?:money|funds|payment|cashback|reward)|and receive|to accept|to get money|to credit|for refund|receive payment|paisa pane ke liye|paisa lene|paise lene|cashback pane|reward pane|inaam pane|इनाम पाने|पैसे पाने|रकम प्राप्त|पैसे प्राप्त/i.test(
           lower
         );
       const claimsQrScanToReceive =
-        /scan qr (to|and) (receive|get|claim)|qr code scan karein paisa (pane|lene)/i.test(lower);
+        /scan qr (to|and) (receive|get|claim)|qr code scan karein paisa (pane|lene)|qr कोड स्कैन.{0,20}(पाने|लेने)/i.test(lower);
 
       // Check for benign counterexample (e.g., standard "You paid Rs X using UPI PIN" or "Never share your UPI PIN")
       const isBenignNotice =
-        /never share your upi pin|do not enter upi pin to receive|debited|sent to|paid rs|bill payment successful/i.test(
+        /never share your upi pin|do not enter upi pin to receive|upi pin.{0,20}(?:share na karein|किसी के साथ साझा न करें)|debited|sent to|paid rs|bill payment successful/i.test(
           lower
         );
 
-      if ((mentionsUpi && mentionsPin && claimsReceiving && !isBenignNotice) || claimsQrScanToReceive) {
+      if ((mentionsUpi && mentionsPin && claimsReceiving && !isBenignNotice) || (claimsQrScanToReceive && !isBenignNotice)) {
         return {
           code: 'upi_receive_pin_trap',
           title: 'UPI Payment / Receive PIN Trap',
@@ -60,31 +60,39 @@ export const DETERMINISTIC_SCAM_RULES: ScamRule[] = [
     },
   },
 
-  // 2. Credential & OTP Solicitation (Scammers asking user to send/tell OTP)
+  // 2. Credential & OTP Solicitation (Scammers asking user to disclose credentials)
   {
     id: 'credential_otp_solicitation',
     name: 'Credential or OTP Solicitation',
-    description: 'Demands or asks the recipient to share or forward an OTP, PIN, or netbanking password.',
+    description: 'Asks the recipient to disclose an OTP, PIN, CVV, password, or banking credential.',
     severity: 'high',
     recommendedAction:
       'Never share your OTP, PIN, or password with anyone, including bank executives or customer care.',
     evaluate: (_text, lower) => {
-      const mentionsOtp = /\botp\b|one[- ]time password|verification code|\bcvv\b/i.test(lower);
-      const asksToShare =
-        /share otp|send (the )?otp|tell (the )?otp|provide (the )?otp|forward (the )?otp|otp share karein|otp batayein|otp bhejein|verify otp with officer/i.test(
-          lower
-        );
+      const credential =
+        /\b(?:upi\s*pin|atm\s*pin|pin|otp|one[- ]time password|verification code|cvv|cvc|password|passcode|banking credentials?|login credentials?)\b|ओटीपी|पिन|सीवीवी|पासवर्ड|बैंकिंग विवरण/i;
+      const request =
+        /\b(?:share|send|tell|provide|forward|disclose|reveal|give|submit|enter|type|input|verify|confirm)\b|(?:share|send|tell|provide|forward|disclose|reveal|submit|enter|verify|confirm)\s+(?:karein|karo|kijiye)|(?:batayein|batao|bhejein|bhejo|dijiye|darj karein|dalein|daalein|bhar dein|साझा करें|बताएं|बताइए|भेजें|दर्ज करें|डालें|प्रदान करें|दीजिए|जमा करें|सत्यापित करें)/i;
+      const isCredentialWarning =
+        /\b(?:do not|don't|never|never ever)\s+(?:share|send|tell|provide|forward|disclose|reveal|give|submit|enter|type)\b|(?:share|send|tell|batayein|bhejein).{0,35}(?:na karein|mat karein|न करें|मत करें)|(?:bank|bank staff|bank executive|bank officer).{0,35}(?:never|does not|do not|कभी नहीं|नहीं मांगता|नहीं पूछता)/i;
 
-      // Benign check: legitimate bank SMS say "Do not share OTP with anyone" or "Bank never calls asking for OTP"
-      const isLegitimateWarning =
-        /do not share|never share|not share with anyone|bank never calls|kisi ke sath share na karein/i.test(lower);
+      const hasCredentialRequest = lower
+        .split(/[.!?।;\n]+/)
+        .some((segment) => {
+          const mentionsCredential = credential.test(segment);
+          const asksToDisclose =
+            request.test(segment) &&
+            (new RegExp(`(?:${credential.source}).{0,60}(?:${request.source})`, 'i').test(segment) ||
+              new RegExp(`(?:${request.source}).{0,60}(?:${credential.source})`, 'i').test(segment));
+          return mentionsCredential && asksToDisclose && !isCredentialWarning.test(segment);
+        });
 
-      if (mentionsOtp && asksToShare && !isLegitimateWarning) {
+      if (hasCredentialRequest) {
         return {
           code: 'credential_otp_solicitation',
-          title: 'Credential or OTP Solicitation',
+          title: 'Banking Credential or OTP Solicitation',
           explanation:
-            'Directly requests that you share, send, or disclose an OTP or confidential code. Legitimate institutions never ask for your OTP.',
+            'The submitted content asks you to disclose or enter an OTP, UPI PIN, CVV, password, or other banking credential. Legitimate institutions do not require these credentials to issue rewards or refunds.',
           signal_type: 'deterministic_rule',
           evidence_refs: [],
         };
@@ -210,11 +218,11 @@ export const DETERMINISTIC_SCAM_RULES: ScamRule[] = [
       'Never pay processing fees or GST to claim lottery winnings. Genuine lotteries never demand advance processing charges.',
     evaluate: (_text, lower) => {
       const mentionsLottery =
-        /kbc lottery|kaun banega crorepati|lucky draw winner|won (rs|inr|\$)?\s*\d{5,8}|lottery number|congratulations you won/i.test(
+        /kbc lottery|kaun banega crorepati|lucky draw winner|won (rs|inr|\$)?\s*\d{5,8}|lottery number|congratulations you won|(?:cashback|reward|prize|gift card|इनाम|पुरस्कार).{0,50}(?:won|winner|claim|receive|credited|जीता|जीतें|पाएं|पाने)/i.test(
           lower
         );
       const mentionsClaimProcess =
-        /whatsapp|call manager|claim department|processing fee|tax fee|deposit fee|sampark karein/i.test(lower);
+        /whatsapp|call manager|claim department|processing fee|claim fee|registration fee|tax fee|deposit fee|pay.{0,30}(?:to claim|to receive|reward|prize|cashback)|sampark karein|प्रोसेसिंग फीस|क्लेम फीस|इनाम.{0,25}(?:शुल्क|फीस|भुगतान)|(?:शुल्क|फीस).{0,25}(?:इनाम|पुरस्कार|कैशबैक)/i.test(lower);
 
       // Benign check: legitimate marketing discounts
       const isBenignPromotion =
@@ -399,15 +407,16 @@ export const DETERMINISTIC_SCAM_RULES: ScamRule[] = [
 /**
  * Evaluates submitted text against the deterministic rule catalogue.
  */
-export function evaluateDeterministicRules(text: string): RuleEvaluationResult {
-  const lower = text.toLowerCase();
+export function evaluateDeterministicRules(text: string, supplementalContext: string[] = []): RuleEvaluationResult {
+  const combinedText = [text, ...supplementalContext].filter(Boolean).join(' ');
+  const lower = combinedText.toLowerCase();
   const matchedReasons: ReasonItem[] = [];
   const actions: string[] = [];
   let hasHighSeverity = false;
   let hasMediumSeverity = false;
 
   for (const rule of DETERMINISTIC_SCAM_RULES) {
-    const reason = rule.evaluate(text, lower);
+    const reason = rule.evaluate(combinedText, lower);
     if (reason) {
       matchedReasons.push(reason);
       if (rule.recommendedAction && !actions.includes(rule.recommendedAction)) {

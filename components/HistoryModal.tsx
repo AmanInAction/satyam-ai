@@ -166,7 +166,7 @@ export function HistoryModal({ isOpen, onClose, onSelectAnalysis }: HistoryModal
               <History className="w-8 h-8 mx-auto opacity-40" />
               <p className="text-sm font-semibold text-slate-600">No verification scans found</p>
               <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                Any text, URL, or screenshot you analyze will be automatically saved here for quick reference.
+                Checks appear here only when you choose to save them to history.
               </p>
             </div>
           ) : (

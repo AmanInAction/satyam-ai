@@ -4,10 +4,12 @@
 [![TypeScript 5.7](https://img.shields.io/badge/TypeScript-5.7-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
 [![Tailwind CSS v4](https://img.shields.io/badge/Tailwind-v4-38bdf8?style=flat&logo=tailwindcss)](https://tailwindcss.com/)
 [![Database](https://img.shields.io/badge/Database-SQLite%20%7C%20Turso-003B57?style=flat&logo=sqlite)](https://turso.tech/)
-[![Vitest](https://img.shields.io/badge/Tests-229_Passed-success?style=flat&logo=vitest)](https://vitest.dev/)
+[![Vitest](https://img.shields.io/badge/Tests-247_Passed-success?style=flat&logo=vitest)](https://vitest.dev/)
 [![National Cyber Helpline](https://img.shields.io/badge/Helpline-1930-red?style=flat)](https://cybercrime.gov.in)
 
-> **SatyamAI** (सत्यम् AI) is a production-grade, India-aware decision-support platform designed to protect citizens from deceptive messages, phishing links, viral claims, and extortion traps. It uniquely separates **Scam/Fraud Risk** from **Factual Claim Verification**, backed by deterministic heuristic rules, live source citations, and contextual AI reasoning.
+> **SatyamAI** (सत्यम् AI) is an India-aware decision-support application for assessing suspicious messages, phishing links, screenshots, and viral claims. It separates **Scam/Fraud Risk** from **Factual Claim Verification**, using deterministic rules, available evidence providers, and AI-assisted reasoning. Results are indicative, not a guarantee of safety or truth.
+
+> **Readiness:** 247 automated tests and TypeScript type checking passed locally on 2026-11-05. Production deployment, live service configuration, and manual browser/accessibility checks are not established by these checks. See [DEVELOPMENT_ROADMAP.md](./DEVELOPMENT_ROADMAP.md) and [docs/REPOSITORY_AUDIT.md](./docs/REPOSITORY_AUDIT.md).
 
 ---
 
@@ -36,10 +38,10 @@ graph TD
     end
 
     subgraph ExternalAdapters ["External Provider Adapters"]
-        Bedrock["Amazon Bedrock Adapter<br/>(Claude 3 Haiku / Nova)"]
+        Bedrock["Amazon Bedrock Text Adapter<br/>(Server-side LLM analysis)"]
         FactCheck["Google Fact Check Tools API<br/>(Attributable Citations)"]
         SafeBrowsing["Safe Browsing / URL Reputation<br/>(Phishing Domain Telemetry)"]
-        VisionOCR["OCR & Vision Adapter<br/>(Screenshot Text Extraction)"]
+        VisionOCR["Amazon Bedrock Vision<br/>(Qwen3 VL 235B, structured OCR)"]
     end
 
     subgraph DataPersistence ["Persistence & Storage Layer (ACID)"]
@@ -76,7 +78,7 @@ sequenceDiagram
     participant API as /api/v1/analyze/*
     participant Guard as Credit Guard
     participant Rules as Deterministic Rules
-    participant LLM as Amazon Bedrock / Gemini
+    participant LLM as Amazon Bedrock (or mock fallback)
     participant Evidence as Fact Check Tools
     participant DB as SQLite / Turso Database
 
@@ -99,7 +101,7 @@ sequenceDiagram
     API->>Evidence: Query fact-checks / domain reputation
     Evidence-->>API: Source title, publisher, URL, rating
 
-    API->>LLM: Synthesize contextual reasoning (Bedrock / Gemini)
+    API->>LLM: Synthesize contextual reasoning (Bedrock when configured)
     LLM-->>API: Structured explanation + recommended actions
 
     API->>Guard: finalizeCreditUsage(reservation, analysisId, success=true)
@@ -181,21 +183,29 @@ Traditional AI chatbots collapse complex information into a single generic label
 
 ### 2. India-Centric Fraud Intelligence
 * **UPI PIN Reversal Traps:** Detects scam offers requesting a UPI PIN to "receive" cashbacks or lottery winnings.
+* **Credential harvesting:** Shared deterministic rules detect requests for OTPs, UPI PINs, CVVs, passwords, and banking credentials—including reward/refund lures—in English, Hindi, and Hinglish.
 * **Fake Electricity Cutoff SMS:** Catches urgent threats warning that power will be disconnected tonight at 9:30 PM.
 * **Fake "Digital Arrest":** Debunks Skype/WhatsApp law enforcement extortion by directly quoting Indian criminal procedure.
 * **Multilingual:** Handles English, Hindi (Devanagari), and Hinglish (colloquial Roman script).
 * **Helpline Routing:** Directly displays the **National Cyber Crime Helpline: 1930** and **cybercrime.gov.in**.
 
-### 3. Environment-Specific Persistent Database
+### 3. Structured Screenshot Analysis
+* Images are validated server-side and sent to Amazon Bedrock using Qwen3 VL 235B (`qwen.qwen3-vl-235b-a22b` by default).
+* Vision returns extracted text and structured indicators for language, claimed organization/reward, requested actions, credential/payment requests, suspicious or impersonation cues, urgency, and confidence.
+* Extracted text and high-confidence visual risk indicators enter the same deterministic scam rules used for submitted text. A credential-theft signal can drive a high-risk verdict even when the language model is inconclusive.
+* Scam risk is assessed separately from whether the reward or other factual claim can be verified; an unverified claim alone is not treated as fraud.
+* Bedrock image inference has a configurable 120-second default timeout. A timeout is reported as unavailable; no OCR text is fabricated.
+
+### 4. Environment-Specific Persistent Database
 * Local development uses Node's native `node:sqlite` (`DatabaseSync`) in **WAL mode**.
 * Vercel production uses the remote Turso/libSQL serverless client; it never relies on the deployment filesystem for durable data.
 * Persistent storage for:
   - Users with salted `scrypt` password hashing.
   - Session tokens with 30-day expiry.
-  - Saved scan history with search and privacy deletion.
+  - Automatically saved scan history with search and user-triggered deletion. See the data-handling caveat below.
   - Credit balances and financial transaction audit ledger.
 
-### 4. Two-Phase Credit Guard & Monetization
+### 5. Two-Phase Credit Guard & Monetization
 * **3 Free Checks** for every guest on first visit.
 * **Two-Phase Reservation:** Checks are reserved prior to analysis and debited only on success.
 * **Fail-Safe Restoration:** If an analysis or provider aborts, credits are immediately returned.
@@ -212,8 +222,8 @@ Traditional AI chatbots collapse complex information into a single generic label
 | **Styling** | Tailwind CSS v4 | High-contrast light theme, accessible ARIA roles, responsive UI |
 | **Database** | SQLite locally; Turso/libSQL on Vercel | Persistent transactional user, scan, and credit data |
 | **Validation** | Zod 3.24 | Strict runtime schema parsing on all requests and responses |
-| **AI Inference** | Amazon Bedrock & Gemini API Adapter | Server-side LLM inference with structured JSON output |
-| **Evidence Retrieval** | Google Fact Check Tools API | Attributable citations with publisher and canonical URL |
+| **AI Inference** | Amazon Bedrock text and Qwen3 VL vision adapters | Server-side inference; structured image analysis; automated tests use mocks |
+| **Evidence Retrieval** | Wikipedia search and optional Google Fact Check adapter | Attributable citations when available; provider availability is not guaranteed |
 | **Security** | SSRF & In-Memory Rate Limiter | Loopback / cloud metadata IP blocking and DDoS mitigation |
 | **Testing** | Vitest 4 | Unit, integration, security, and benchmark suites |
 
@@ -235,6 +245,18 @@ cd satyam-ai
 npm install
 ```
 
+### Amazon Bedrock (text and screenshot analysis)
+Copy `.env.example` to `.env` and set AWS credentials plus the Bedrock region/model settings for your account. Keep credentials server-side; never commit `.env` or paste secret values into issue reports.
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `BEDROCK_MODEL_ID` | Text-analysis model | Set the model enabled for your account |
+| `BEDROCK_VISION_MODEL_ID` | Screenshot OCR and visual analysis model | `qwen.qwen3-vl-235b-a22b` |
+| `BEDROCK_REGION` | AWS Bedrock region | Falls back to `AWS_REGION`, then `ap-south-1` |
+| `BEDROCK_TIMEOUT_MS` | Vision request timeout in milliseconds | `120000` |
+
+Confirm that the selected model is enabled and available in the configured region, and that the AWS identity can invoke it. Restart the development server after changing environment variables. If screenshot analysis times out, the result reports `request_timeout`; check the configured timeout and Bedrock model/region availability.
+
 ### Local Development
 ```bash
 # Run the local development server (runs on port 3000)
@@ -244,7 +266,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ### Running Tests & Quality Checks
 ```bash
-# Run all 229 automated Vitest tests across 20 suites
+# Run all 247 automated Vitest tests across 20 suites
 npm run test
 
 # Run TypeScript type validation (0 errors)
@@ -279,7 +301,7 @@ The importer preserves user credentials, sessions, scan history, credit balances
 ### Core Analysis
 * `POST /api/v1/analyze/text`: Evaluates suspicious messages or viral claims (Cost: 1 check).
 * `POST /api/v1/analyze/url`: Inspects links for phishing and brand spoofing (Cost: 1 check).
-* `POST /api/v1/analyze/image`: Extracts and analyzes screenshot text (Cost: 2 checks).
+* `POST /api/v1/analyze/image`: Extracts screenshot text and structured Qwen vision indicators, then applies the shared scam rules (Cost: 2 checks).
 * `GET /api/v1/health`: System health and provider availability diagnostics.
 
 ### Authentication & User Accounts (SQLite locally, Turso in production)
@@ -290,7 +312,7 @@ The importer preserves user credentials, sessions, scan history, credit balances
 
 ### Scan History & Privacy Controls
 * `GET /api/v1/history`: Retrieves user's past scans with search, filtering, and pagination.
-* `DELETE /api/v1/history?id=...`: Deletes a specific scan or wipes all history (Privacy by Default).
+* `DELETE /api/v1/history?id=...`: Deletes a specific scan or wipes all history. New analyses are not saved unless you explicitly select **Save this check to history**.
 
 ### Monetization & Payments Sandbox
 * `GET /api/v1/payments/credits`: Retrieves current check balance, allowance, and purchase packs.
@@ -307,9 +329,9 @@ The importer preserves user credentials, sessions, scan history, credit balances
 
 ## 🔒 Security & Privacy Guarantees
 
-1. **Privacy by Default:** Raw submissions are not permanently stored unless explicitly saved to your SQLite history, which you can wipe at any time.
+1. **Analysis history:** Analyses are not saved by default. If you explicitly opt in for a check, SQLite stores an input preview and the complete result, which may include submitted text, a URL, or extracted screenshot text. Saved history remains until you delete it in the app; there is no automatic retention expiry.
 2. **SSRF Protection:** Server-side fetching strictly blocks `127.0.0.1`, `localhost`, private ranges (`10.0.0.0/8`, `192.168.0.0/16`), and cloud metadata services (`169.254.169.254`).
-3. **Adversarial Defenses:** User input containing prompt-injection tokens (`"Ignore all previous instructions"`) is treated as untrusted text and cannot override classification rules.
+3. **Adversarial Defenses:** Prompt-boundary handling and deterministic checks treat suspicious instructions as untrusted input; this is a defense-in-depth measure, not a guarantee against every attack.
 4. **Idempotency:** Payment captures and webhook retries are guarded by database-backed unique indexes to eliminate duplicate crediting.
 
 ---

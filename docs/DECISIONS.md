@@ -19,10 +19,11 @@ Record material decisions so the solo developer and coding agent can understand 
 
 ## D-003 — No default persistence of raw submissions
 - **Date:** 2026-10-13
-- **Status:** Accepted
+- **Status:** Accepted and implemented (per-analysis opt-in)
 - **Decision:** Do not persist raw message text, URLs, or images by default.
 - **Context:** Submissions may contain personal, financial, or sensitive information.
-- **Trade-off:** No full history by default. Any storage feature requires disclosure, minimization, retention, and deletion behavior.
+- **Trade-off:** No full history by default. Any storage feature requires clear notice/consent, minimization, retention, and deletion behavior.
+- **Implementation:** Analysis routes save an input preview and complete result only when the request explicitly opts in. Image results may contain extracted text. Users can delete saved history; opted-in records do not expire automatically, which is disclosed in the UI and documentation.
 
 ## D-004 — Verdicts express uncertainty
 - **Date:** 2026-10-13
@@ -34,9 +35,9 @@ Record material decisions so the solo developer and coding agent can understand 
 ## D-005 — Core before optional differentiators
 - **Date:** 2026-10-13
 - **Status:** Accepted
-- **Decision:** Text, URL, evidence, safety, evaluation, and deployment gates precede Telegram, history, browser extension, deepfake detection, and advanced forensics.
+- **Decision:** Text, URL, evidence, safety, evaluation, and deployment gates precede optional differentiators.
 - **Context:** Solo developer and Nov 13–14 submission window.
-- **Trade-off:** Some features remain deferred.
+- **Status note (2026-11-03):** Screenshot, Telegram, account/history, credit/payment, and Turso implementations were added in later phases. Browser extension, reverse-image search, advanced media forensics, custom model training, community features, and unneeded infrastructure remain deferred.
 
 ## D-006 — Prior separate frontend/backend architecture
 - **Date:** 2026-10-13
@@ -47,7 +48,7 @@ Record material decisions so the solo developer and coding agent can understand 
 
 ## D-007 — Full-stack Next.js App Router
 - **Date:** 2026-10-13
-- **Status:** Accepted; migration reported, re-verify repository
+- **Status:** Accepted and current; repository architecture re-verified 2026-11-03
 - **Decision:** Use Next.js App Router, TypeScript, Route Handlers under `/api/v1`, Zod validation, modular orchestrator, and server-only provider adapters.
 - **Trade-off:** Keeps the MVP in one deployable application; maintain clear module boundaries.
 
@@ -57,11 +58,11 @@ Record material decisions so the solo developer and coding agent can understand 
 - **Decision:** Use Amazon Bedrock rather than Gemini for model access, with model selection isolated behind an adapter.
 - **Context:** Access to multiple models and ability to compare affordability/quality.
 - **Trade-off:** AWS configuration and model/region availability must be verified; do not hard-code one model into domain logic.
-- **Follow-up:** Verify credentials, region, model access, current pricing, quotas, structured-output capability, and fallback behavior.
+- **Follow-up:** Verify credentials, region, model access, current pricing, quotas, structured-output capability, and fallback behavior in the target deployment; this repository audit did not inspect or verify deployment secrets.
 
 ## D-009 — Unified scam-risk and claim-verification dimensions
 - **Date:** 2026-10-13
-- **Status:** Accepted product requirement; implementation pending verification
+- **Status:** Accepted product requirement; implemented and covered by automated tests
 - **Decision:** SatyamAI should assess scam/security risk and factual claim status in one workflow while keeping verdicts separate.
 - **Context:** A legitimate URL can host misleading content, and a true claim can appear in a scam message.
 - **Trade-off:** More careful schema and UI are required to avoid confusing the user.
@@ -69,9 +70,9 @@ Record material decisions so the solo developer and coding agent can understand 
 
 ## D-010 — Evidence must be attributable and uncertainty explicit
 - **Date:** 2026-10-13
-- **Status:** Accepted product requirement
+- **Status:** Accepted product requirement; implementation and automated coverage exist, provider availability remains environment-dependent
 - **Decision:** Evidence must be real and attributable; AI inference must not be presented as a citation; missing evidence must not imply safety.
-- **Follow-up:** Add provenance and missing-check behavior where compatible with the current schema.
+- **Follow-up:** Verify live provider behavior and source quality in the target environment.
 
 ## D-011 — India-aware patterns and evaluation
 - **Date:** 2026-10-13
@@ -84,6 +85,7 @@ Record material decisions so the solo developer and coding agent can understand 
 - **Status:** Accepted conditional scope
 - **Decision:** If implemented, Telegram must reuse the same server-side analysis pipeline and safety rules.
 - **Gate:** Only after core web flow and release gates pass.
+- **Status note (2026-11-03):** Webhook and link-code routes are implemented and covered by tests. A production bot registration and live message exchange remain unverified.
 
 ## D-013 — Phase 2 Reliable Text-Analysis MVP & Bedrock Provider Adapter Architecture
 - **Date:** 2026-10-14
@@ -117,27 +119,29 @@ Record material decisions so the solo developer and coding agent can understand 
   5. **Provenance Transparency:** Distinguishes between `fact_check_database`, `encyclopedic_reference`, `reputation_feed`, and `evidence_limited_inference`.
 - **Trade-off:** Requires separate classification objects and UI panels, but provides users with complete clarity on why a message is risky and whether its claims are factual.
 
-## D-011: Screenshot Analysis, Image Security Controls & Regional Readability
+## D-011A — Screenshot Analysis, Image Security Controls & Regional Readability
 - **Date:** 2026-10-17
 - **Status:** Implemented and Verified
 - **Decision:** Implement screenshot analysis with rigorous defensive security controls and localized UX:
   1. **Strict Defensive Boundary (`src/lib/security/imageSecurity.ts`):** Enforces 5 MB size ceiling (HTTP 413 `FILE_TOO_LARGE`), validates binary magic bytes (`PNG: \x89PNG\r\n\x1a\n`, `JPEG: \xFF\xD8\xFF`, `WebP: RIFF`), and verifies dimensions via pure binary header parsing (bounded between 50x50 and 8000x8000 px) with zero external native binary dependencies.
-  2. **Replaceable OCR / Vision Provider (`src/lib/providers/visionProvider.ts`):** Implements `BedrockVisionProvider` (Claude 3 Haiku vision model via `@aws-sdk/client-bedrock-runtime`), `MockVisionOcrProvider` (deterministic local test & dev extraction), and `CompositeVisionProvider` for graceful fallback.
+  2. **Replaceable OCR / Vision Provider (`src/lib/providers/visionProvider.ts`):** Implements `BedrockVisionProvider` (Qwen3 VL 235B via Amazon Bedrock Converse, configurable with `BEDROCK_VISION_MODEL_ID`), `MockVisionOcrProvider` for deterministic tests, and `CompositeVisionProvider`. Bedrock returns structured OCR and visual indicators. The vision timeout defaults to 120 seconds (`BEDROCK_TIMEOUT_MS`); provider failures return a sanitized error code, and unavailable analysis never substitutes fabricated OCR text.
   3. **Graceful Handling of Unreadable & Blank Images:** Completely unreadable or textless screenshots evaluate gracefully to `unverified` verdict, `insufficient_information` category, and `unknown` risk with explanatory guidance, without crashing or hallucinating safety.
   4. **Sensitive Data Detection:** Detects unmasked card numbers, CVV codes, and passwords in extracted text, placing cautionary guidance in recommended actions.
   5. **OCR Review & Refinement Flow:** Frontend provides OCR text inspection and an inline editor allowing users to correct OCR mistakes before re-evaluating.
-  6. **Unified Orchestration & Explicit Authenticity Disclaimer:** Extracted text is evaluated through the exact same orchestrator pipeline with dual assessment, deterministic rules, and evidence grounding. Transparently adds a disclaimer that OCR cannot authenticate screenshots or detect photoshop tampering.
+  6. **Unified Orchestration & Explicit Authenticity Disclaimer:** Extracted text and confident structured visual risk indicators are evaluated through the same orchestrator pipeline with deterministic rules, dual assessment, and evidence grounding. Credential-theft rules take precedence over inconclusive model verdicts, while factual verification remains independent. Transparently adds a disclaimer that image analysis cannot authenticate screenshots or detect photoshop tampering.
   7. **Regional UX (Hindi & Hinglish):** Detects Devanagari script or language hints, formulating localized Hindi/Hinglish summaries, risk labels (`उच्च जोखिम`), and India National Cyber Crime Helpline (1930) actions.
+  8. **Credential-theft risk precedence:** Extracted image text and visual credential/payment indicators are evaluated by the existing deterministic scam rules. High-confidence credential harvesting remains high risk when the text LLM is inconclusive; factual claim verification is independent, so an unsupported reward is not automatically classified as fraud.
 
 ## Verified External Integrations
-- **Real AWS Bedrock live API call:** **VERIFIED** on 2026-10-18 using live AWS Bedrock `Converse` API in `ap-south-1` with 5.3s response time.
-- **Wikipedia Evidence Provider:** **VERIFIED** live keyless attributable citations.
-- **Cloudflare DNS 1.1.1.2 Reputation Provider:** **VERIFIED** live DNS-over-HTTPS threat queries.
-- **Telegram Webhook Integration:** **VERIFIED** on 2026-10-18 via Next.js App Router Webhook endpoint (`/api/v1/telegram/webhook`) reusing `AnalysisOrchestrator`.
+The following are historical verification records from October 2026, not evidence that credentials, service availability, or deployment behavior were checked in the 2026-11-03 audit:
+- **AWS Bedrock live API call:** Reported verified on 2026-10-18 using Bedrock `Converse` in `ap-south-1`.
+- **Wikipedia Evidence Provider:** Reported live verification.
+- **Cloudflare DNS 1.1.1.2 Reputation Provider:** Reported live DNS-over-HTTPS verification.
+- **Telegram Webhook Integration:** Route was verified by automated tests; production bot registration/live exchange still requires verification.
 
 ## D-016 — Phase 8 Telegram Webhook Integration & Pipeline Reuse
 - **Date:** 2026-10-18
-- **Status:** Implemented and Verified
+- **Status:** Implemented and automated tests pass; production webhook setup not verified
 - **Decision:** Implement a secure, server-side Telegram Webhook handler at `/api/v1/telegram/webhook` that routes messages directly through the existing `AnalysisOrchestrator` without creating a second intelligence workflow or duplicating analysis rules.
 - **Key Safeguards:**
   1. **Direct Webhook Responses:** Uses Telegram's direct JSON response payload (`{ method: 'sendMessage', chat_id, text, parse_mode: 'Markdown' }`) for zero-latency responses.
@@ -149,7 +153,7 @@ Record material decisions so the solo developer and coding agent can understand 
 
 ## D-017 — Phase 9: PayPal Sandbox Integration & Credit-Based Freemium Ledger
 - **Date:** 2026-10-19
-- **Status:** Implemented and Verified
+- **Status:** Implemented; configured PayPal sandbox end-to-end operation remains unverified
 - **Decision:** Implement a server-controlled credit-based freemium model and PayPal Sandbox integration without introducing external microservices or heavy SQL databases:
   1. **Idempotent Freemium Grant (`src/lib/payments/ledger.ts`):** Each eligible new user receives 3 free verification credits exactly once on their initial request. Repeated sign-ins, page reloads, and webhook retries cannot grant additional free credits.
   2. **Two-Phase Reservation & Commit Lifecycle (`src/lib/payments/creditGuard.ts`):**
@@ -169,11 +173,11 @@ Record material decisions so the solo developer and coding agent can understand 
      - Credit exhaustion never leaves users defenseless: the Essential Scam Safety Guidance card is rendered prominently, delivering vital Indian cybercrime rules (Helpline 1930, never share OTP/UPI PIN, no digital arrest) with direct links to the national reporting portal.
 ## D-018 — Phase 10: Node 22 Native SQLite for User Authentication, Persistent Scan History, and Data Migration
 - **Date:** 2026-10-23
-- **Status:** Implemented and Verified
+- **Status:** Local implementation and automated tests pass; remote Turso operation and privacy release gate remain open
 - **Decision:** Implement zero-dependency native SQLite persistence using Node 22's built-in `node:sqlite` (`DatabaseSync`) in WAL mode for persistent user accounts, session tokens, searchable scan history, and financial transactions:
   1. **Zero-Dependency Native SQLite:** By leveraging Node 22's native `DatabaseSync`, SatyamAI eliminates external native C++ bindings (`better-sqlite3`, `sqlite3`), preventing cross-platform compiler mismatches or container deployment failures while retaining full ACID compliance.
   2. **Salted Scrypt Cryptography:** User passwords are hashed using Node's standard `crypto.scryptSync(password, salt, 64)` with unique 16-byte cryptographically random salts and constant-time verification (`crypto.timingSafeEqual`).
   3. **Dual-Mode Session Resolution:** Route handlers transparently accept either 30-day authenticated session tokens (`satyam_session_token` cookie or `Authorization: Bearer` header) or anonymous guest session identifiers (`x-user-id`).
   4. **Anonymous-to-Account Migration:** When a guest registers or logs in, `migrateUser` and `migrateAnonymousData` automatically transfer all remaining check balances, past transaction ledger rows, and scan records from the anonymous user to the new authenticated user.
-  5. **Privacy-Preserving User History:** Saved analyses in SQLite can be searched by keyword or verdict, retrieved by ID, and deleted either individually or entirely via `DELETE /api/v1/history`, fulfilling Product Principle 5 (Privacy by Default).
-  6. **Automated Test Validation:** 12 dedicated tests in `tests/sqliteAuthHistory.test.ts` verify table creation, user hashing, session expiration, search, privacy deletion, and data migration, bringing the total test suite to 218 passing tests across 19 suites.
+  5. **User History:** Analyses are saved only with explicit per-analysis opt-in, including an input preview and complete result; image results may contain extracted text. Records can be searched by keyword or verdict, retrieved by ID, and deleted individually or entirely via `DELETE /api/v1/history`. Opted-in records remain until deletion; no automatic expiry is implemented.
+  6. **Automated Test Validation:** The phase report recorded 12 dedicated tests in `tests/sqliteAuthHistory.test.ts` and 218 total tests at phase completion. The current repository suite is 234 tests across 20 files (verified 2026-11-04).

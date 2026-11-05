@@ -1,6 +1,6 @@
 # API Contract — SatyamAI
 
-**Status:** Contract target; the implemented Zod schemas and Route Handlers are authoritative at runtime. Keep this document synchronized with `src/lib/validation/schemas.ts` and actual routes.
+**Status:** Describes the current route surface and intended contract; the implemented Zod schemas and Route Handlers are authoritative at runtime. Keep this document synchronized with `src/lib/validation/schemas.ts` and actual routes. The presence of an adapter or route does not establish that its external service is configured or production-verified.
 
 ## Conventions
 
@@ -25,16 +25,25 @@
 | GET | `/api/v1/auth/me` | P1 | Get active user profile, auth state, and available checks |
 | POST | `/api/v1/auth/logout` | P1 | Destroy session token and clear authentication cookie |
 | GET | `/api/v1/history` | P1 | Query user's past saved scans with search and pagination |
-| DELETE | `/api/v1/history` | P1 | Delete single scan or clear all history (Privacy by Default) |
+| DELETE | `/api/v1/history` | P1 | Delete a scan explicitly saved to history |
 | GET | `/api/v1/payments/credits` | P1 | Retrieve current balance, allowance, and purchase packages |
 | POST | `/api/v1/payments/create-order` | P1 | Generate server-authoritative sandbox payment order |
 | POST | `/api/v1/payments/capture-order` | P1 | Capture payment and idempotently credit purchased checks |
 | GET | `/api/v1/payments/transactions` | P1 | Chronological audit ledger of all balance changes |
 | POST | `/api/v1/payments/webhook` | P1 | Asynchronous webhook handler for payment capture/refund |
+| GET | `/api/v1/telegram/webhook` | P1 | Telegram webhook configuration diagnostics |
 | POST | `/api/v1/telegram/webhook` | P1 | Telegram Bot webhook with deduplication and helpline routing |
 | POST | `/api/v1/telegram/link-code` | P1 | Create a one-time code to link an authenticated website account to Telegram |
 
-Do not implement optional endpoints before their phase. Confirm current route names in the repository before making changes.
+All listed routes are implemented in this checkout. `OPTIONS` handlers are also present on API routes where applicable. This inventory does not imply live provider credentials or successful production setup. Confirm current route names in the repository before making changes.
+
+## Current data handling and operational caveats
+
+- Analyses are not persisted by default. Set `save_to_history: true` in a text/URL JSON request, or submit `save_to_history=true` in multipart image form data, to explicitly save that analysis. The database stores an input preview and complete result; image results may include extracted text.
+- History can be listed and deleted through `GET`/`DELETE /api/v1/history`. Opted-in records remain until deleted; there is no automatic retention expiry.
+- Local development uses SQLite; production selection may use Turso/libSQL when configured. Remote migration and production behavior require independent verification.
+- Bedrock, Google Fact Check, Google Safe Browsing, vision/OCR, Telegram, and PayPal behavior depends on environment configuration. Tests may use mock or simulated paths.
+- PayPal returns simulated orders when credentials are not configured. A simulated response is not a real sandbox order or capture.
 
 ## Text request
 
@@ -43,7 +52,8 @@ Do not implement optional endpoints before their phase. Confirm current route na
 ```json
 {
   "text": "Your account will be blocked. Pay a fee immediately using this link.",
-  "language_hint": "auto"
+  "language_hint": "auto",
+  "save_to_history": false
 }
 ```
 
@@ -59,7 +69,8 @@ Validation expectations:
 
 ```json
 {
-  "url": "https://example.com/path"
+  "url": "https://example.com/path",
+  "save_to_history": false
 }
 ```
 
@@ -78,17 +89,22 @@ Supported Request Encodings:
 1. `multipart/form-data`:
    - `file` or `image`: image binary upload (`image/png`, `image/jpeg`, `image/webp`).
    - `language_hint`: `auto`, `en`, `hi`, `hinglish` (optional).
+   - `save_to_history`: `true` to explicitly save this analysis (optional; defaults to false).
 2. `application/json`:
    - `image_data`: base64-encoded image string (with or without data URI scheme).
    - `mime_type`: `image/png`, `image/jpeg`, or `image/webp`.
    - `language_hint`: `auto`, `en`, `hi`, `hinglish` (optional).
+   - `save_to_history`: boolean (optional; defaults to false).
 
 Validation & Security expectations:
 - File size capped at 5 MB (`MAX_IMAGE_SIZE_BYTES = 5,242,880`). Requests exceeding limit return HTTP 413 `FILE_TOO_LARGE`.
 - Magic byte verification: validates container signatures (`PNG: \x89PNG\r\n\x1a\n`, `JPEG: \xFF\xD8\xFF`, `WebP: RIFF....WEBP`).
 - Safe dimensions: parsed securely via binary headers without external dependencies; bounded between 50x50 and 8000x8000 px.
 - Unreadable/blank image handling: returns safe `unverified` verdict, `insufficient_information` category, and `unknown` risk level without crashing or hallucinating safety.
+- OCR provider outage or missing configuration: returns an `unverified` / `unknown` result with the provider status; it never substitutes mock or fabricated text. Vision failure reasons may include a sanitized provider code (for example `request_timeout` or `AccessDeniedException`), but never raw exceptions, credentials, or image content.
+- Bedrock vision configuration: `BEDROCK_VISION_MODEL_ID` defaults to `qwen.qwen3-vl-235b-a22b`; `BEDROCK_REGION` falls back to `AWS_REGION` and then `ap-south-1`; `BEDROCK_TIMEOUT_MS` defaults to 120,000 ms. The deployment must have model access in the selected region and permission to invoke it.
 - Sensitive credential guard: warns user if unmasked credit cards, CVVs, or netbanking passwords are detected in screenshot text.
+- Structured vision output: image responses may include additive `visual_analysis` fields for extracted text, detected language, claimed organization/reward, requested actions, credential and payment requests, suspicious/impersonation/urgency indicators, confidence, and a visual summary. These indicators supplement the shared deterministic text rules; they do not establish factual accuracy.
 - Adversarial prompt injection defense: instructions embedded within image text are treated as untrusted and cannot override system verdicts.
 - Authenticity disclaimer: transparently records limitations that OCR cannot detect photoshop tampering, receipt forgery, or screenshot authenticity.
 

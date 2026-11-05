@@ -32,6 +32,7 @@ describe('Validation Schemas', () => {
       expect(res.success).toBe(true);
       if (res.success) {
         expect(res.data.language_hint).toBe('auto');
+        expect(res.data.save_to_history).toBe(false);
       }
     });
   });
@@ -41,6 +42,9 @@ describe('Validation Schemas', () => {
       const valid = { url: 'https://example.com/login' };
       const res = UrlAnalysisRequestSchema.safeParse(valid);
       expect(res.success).toBe(true);
+      if (res.success) {
+        expect(res.data.save_to_history).toBe(false);
+      }
     });
 
     it('accepts valid http URL', () => {

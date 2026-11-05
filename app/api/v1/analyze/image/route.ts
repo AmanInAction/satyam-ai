@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
   let imageBuffer: Buffer;
   let declaredMimeType: string | undefined;
   let languageHint: string = 'auto';
+  let saveToHistory = false;
 
   if (contentType.includes('multipart/form-data')) {
     try {
@@ -53,6 +54,7 @@ export async function POST(req: NextRequest) {
       if (typeof hint === 'string' && ['auto', 'en', 'hi', 'hinglish'].includes(hint)) {
         languageHint = hint;
       }
+      saveToHistory = formData.get('save_to_history') === 'true';
 
       const arrayBuffer = await fileEntry.arrayBuffer();
       imageBuffer = Buffer.from(arrayBuffer);
@@ -106,6 +108,7 @@ export async function POST(req: NextRequest) {
 
     declaredMimeType = parseResult.data.mime_type;
     languageHint = parseResult.data.language_hint || 'auto';
+    saveToHistory = parseResult.data.save_to_history;
   } else {
     return createErrorResponse(
       415,
@@ -155,28 +158,29 @@ export async function POST(req: NextRequest) {
       true
     );
 
-    // Save to SQLite database for persistent user history
-    try {
-      const extractedSummary = analysis.extracted_text?.slice(0, 200) || 'Screenshot / Image scan';
-      await defaultDb.saveAnalysis({
-        id: analysis.analysis_id,
-        userId: creditGuardResult.sessionInfo.userId,
-        inputType: 'image',
-        inputPreview: extractedSummary,
-        verdict: analysis.classification.scam_risk.verdict,
-        scamRisk: analysis.classification.scam_risk.risk_level,
-        claimVerdict: analysis.classification.claim_verification.verdict,
-        confidenceScore: 0.9,
-        reasonsSummary:
-          analysis.reasons?.map((r) => r.title || r.explanation).slice(0, 2).join('; ') ||
-          'Screenshot OCR and threat analysis completed',
-        fullResult: analysis,
-      });
-    } catch (error) {
-      safeLogger.error('Failed to persist image analysis history.', {
-        analysisId: analysis.analysis_id,
-        error: error instanceof Error ? error.message : String(error),
-      });
+    if (saveToHistory) {
+      try {
+        const extractedSummary = analysis.extracted_text?.slice(0, 200) || 'Screenshot / Image scan';
+        await defaultDb.saveAnalysis({
+          id: analysis.analysis_id,
+          userId: creditGuardResult.sessionInfo.userId,
+          inputType: 'image',
+          inputPreview: extractedSummary,
+          verdict: analysis.classification.scam_risk.verdict,
+          scamRisk: analysis.classification.scam_risk.risk_level,
+          claimVerdict: analysis.classification.claim_verification.verdict,
+          confidenceScore: 0.9,
+          reasonsSummary:
+            analysis.reasons?.map((r) => r.title || r.explanation).slice(0, 2).join('; ') ||
+            'Screenshot OCR and threat analysis completed',
+          fullResult: analysis,
+        });
+      } catch (error) {
+        safeLogger.error('Failed to persist image analysis history.', {
+          analysisId: analysis.analysis_id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
 
     const response = NextResponse.json({

@@ -1,12 +1,20 @@
 # SOURCE_OF_TRUTH.md
 ## SatyamAI — Scam & Misinformation Checker
 
-**Status:** Authoritative product specification  
-**Updated:** 2026-10-13  
-**Owner:** Solo developer  
+**Status:** Authoritative product specification
+**Updated:** 2026-11-05
+**Owner:** Solo developer
 **Target submission:** 2026-11-13 to 2026-11-14
 
-> Agent rule: read this document first, then `DEVELOPMENT_ROADMAP.md`, `docs/COMPETITIVE_GAP_ANALYSIS.md`, `docs/API_CONTRACT.md`, `docs/TEST_PLAN.md`, and `docs/DECISIONS.md`. Inspect the current repository before changing code. This specification defines intended behavior; the repository and test results define what is actually implemented.
+> Agent rule: read this document first, then `DEVELOPMENT_ROADMAP.md`, `docs/REPOSITORY_AUDIT.md`, `docs/API_CONTRACT.md`, `docs/TEST_PLAN.md`, and `docs/DECISIONS.md`. Inspect the current repository before changing code. This specification defines intended behavior; the repository and test results define what is actually implemented.
+
+## Current implementation snapshot (2026-11-05)
+
+Phases 0–10 have implemented code in this checkout. Local verification on 2026-11-05: `npm test` passed (247 tests across 20 files) and `npm run lint` passed. The user confirmed that local screenshot analysis is now working with the configured Bedrock vision provider. This does not establish production deployment readiness; deployed credentials, model access, browser/device checks, and remote database operations remain independently unverified. See `DEVELOPMENT_ROADMAP.md` and `docs/REPOSITORY_AUDIT.md` for remaining gates.
+
+**Current data handling:** text, URL, and image analyses are not saved by default. The user can explicitly opt in per check; saved history includes an input preview and complete analysis result, and remains until the user deletes it. There is no automatic retention expiry.
+
+**Provider behavior:** outside automated tests, the orchestrator uses Bedrock rather than a mock LLM. Screenshot analysis uses Qwen3 VL 235B through Amazon Bedrock Converse by default (`BEDROCK_VISION_MODEL_ID` can override it); the vision request timeout defaults to 120,000 ms and can be set with `BEDROCK_TIMEOUT_MS`. Images produce structured visual analysis and extracted text; both feed the shared deterministic scam checks. A timeout or unavailable provider does not fabricate OCR output and yields an unverified/unknown image result with a sanitized provider failure code.
 
 ## 1. Product vision
 
@@ -22,7 +30,7 @@ This is a decision-support tool—not an authority that can guarantee a message 
 2. Separate risk dimensions: scam/security risk and factual accuracy must not be collapsed into one label.
 3. Uncertainty is a valid result: missing evidence is not evidence of safety or falsity.
 4. India-aware, language-accessible UX: prioritize English, Hindi, and Hinglish and locally relevant scam patterns where supported.
-5. Privacy by default: do not persist raw submissions unless a feature explicitly requires it and retention/disclosure are implemented.
+5. Privacy by default: do not persist submissions or derived sensitive content unless the user has clear notice and control, and retention/deletion are implemented.
 6. Small, testable architecture: maintain a modular monolith; no microservices for the MVP.
 7. Provider independence: AI, evidence search, URL reputation, and OCR must sit behind replaceable adapters.
 8. Honest release reporting: mocks are not real integrations; never claim features or tests passed without verification.
@@ -58,16 +66,17 @@ This is a decision-support tool—not an authority that can guarantee a message 
 ### P1 — after P0 is stable
 - Screenshot upload with OCR/vision extraction, size/type checks, and extracted-text review where practical.
 - Minimal feedback capture.
-- Telegram bot that reuses the same analysis pipeline/API, only if time allows and security checks pass.
 - Basic safe caching with TTL if a real need is demonstrated.
-- Lightweight history only if privacy disclosure, retention, and deletion are explicitly implemented.
+- History is implemented as explicit per-analysis opt-in. Saved records remain until the user deletes them; ensure this no-expiry behavior remains disclosed.
 
 ### P2 — defer unless explicitly approved
 - Browser extension.
 - Reverse-image search, deepfake detection, or advanced media forensics.
-- Complex accounts, social/community features, or admin portal.
+- Social/community features or an admin portal.
 - Custom model training.
 - Microservices or infrastructure added without demonstrated need.
+
+**Already implemented outside the original core scope:** screenshot analysis, Telegram webhook, user accounts, scan history, credit ledger, PayPal sandbox flow, and Turso/libSQL support. Do not describe these as deferred. Their live configuration and production operation still require separate release verification.
 
 ## 5. Market context and differentiation requirements
 
@@ -170,7 +179,7 @@ Never say “safe” as an absolute guarantee. Never say a payment happened or a
 - If fetching is implemented: allow only HTTP(S), block local/private/link-local/reserved destinations, validate DNS and every redirect, restrict ports, cap redirects/bytes/time, and mitigate DNS rebinding.
 - Validate content types, character limits, image dimensions/size, and upload formats.
 - Apply rate limits, timeouts, bounded retries, redacted logs, safe errors, and appropriate security headers.
-- Do not store raw messages, URLs, or images by default.
+- Do not store raw messages, URLs, or images by default. Routes save the input preview and full result only when `save_to_history` is explicitly true; saved records remain until user deletion.
 - Do not ask for or retain OTPs, PINs, passwords, full payment credentials, or unnecessary personal information.
 - For Indian cyber-fraud guidance, verify official reporting details before hardcoding them.
 
@@ -187,7 +196,7 @@ Never say “safe” as an absolute guarantee. Never say a payment happened or a
 
 ## 10. Release acceptance
 
-The MVP is not complete until:
+The product is not ready for production until:
 - text and URL flows work end-to-end in the integrated app;
 - actual provider integrations are distinguished from mocks;
 - schema, error, timeout, partial-result, and provider-outage paths are tested;
@@ -197,12 +206,14 @@ The MVP is not complete until:
 - no secrets leak into client bundles or logs;
 - data handling and known limitations are documented;
 - clean setup, production build, and deployment smoke tests pass;
+- production persistence, payment, Telegram, and provider configurations are verified in the target environment;
+- analysis history remains opt-in and the no-automatic-expiry behavior is accurately disclosed;
 - results do not fabricate evidence or overstate certainty.
 
 ## 11. Agent workflow
 
 At the start of each work session:
-1. Read this file, roadmap, API contract, test plan, decisions, and competitive-gap document.
+1. Read this file, roadmap, repository audit, API contract, test plan, and decisions.
 2. Inspect actual repository state and current tests before editing.
 3. Map requirements to code and mark each `implemented`, `partial`, `missing`, `blocked`, or `deferred`.
 4. Implement the next highest-priority missing requirement, not every stretch feature at once.

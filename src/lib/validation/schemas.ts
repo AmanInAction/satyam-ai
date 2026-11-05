@@ -10,6 +10,7 @@ export const TextAnalysisRequestSchema = z.object({
     .enum(['auto', 'en', 'hi', 'hinglish'])
     .optional()
     .default('auto'),
+  save_to_history: z.boolean().optional().default(false),
 });
 
 export type TextAnalysisRequest = z.infer<typeof TextAnalysisRequestSchema>;
@@ -30,6 +31,7 @@ export const UrlAnalysisRequestSchema = z.object({
       },
       { message: 'Only http and https protocols are supported' }
     ),
+  save_to_history: z.boolean().optional().default(false),
 });
 
 export type UrlAnalysisRequest = z.infer<typeof UrlAnalysisRequestSchema>;
@@ -40,6 +42,7 @@ export const ImageAnalysisRequestSchema = z.object({
     errorMap: () => ({ message: 'Supported image types are image/png, image/jpeg, and image/webp' }),
   }),
   language_hint: z.enum(['auto', 'en', 'hi', 'hinglish']).optional().default('auto'),
+  save_to_history: z.boolean().optional().default(false),
 });
 export type ImageAnalysisRequest = z.infer<typeof ImageAnalysisRequestSchema>;
 
@@ -124,12 +127,29 @@ export const ProviderStatusEnum = z.enum([
 ]);
 export type ProviderStatus = z.infer<typeof ProviderStatusEnum>;
 
+export const VisualAnalysisSchema = z.object({
+  extracted_text: z.string(),
+  language_detected: z.string(),
+  claimed_organization: z.string().nullable(),
+  claimed_offer_or_reward: z.string().nullable(),
+  requested_user_action: z.string().nullable(),
+  credential_requests: z.array(z.string()),
+  payment_instructions: z.array(z.string()),
+  suspicious_indicators: z.array(z.string()),
+  impersonation_indicators: z.array(z.string()),
+  urgency_indicators: z.array(z.string()),
+  confidence: z.number().min(0).max(1),
+  visual_analysis_summary: z.string(),
+});
+export type VisualAnalysis = z.infer<typeof VisualAnalysisSchema>;
+
 export const AnalysisResponseSchema = z.object({
   analysis_id: z.string(),
   input_type: z.enum(['text', 'url', 'image']),
   analysis_type: AnalysisTypeSchema.optional(),
   extracted_claim: z.string().nullable().optional(),
   extracted_text: z.string().nullable().optional(),
+  visual_analysis: VisualAnalysisSchema.optional(),
   classification: ClassificationSchema,
   verdict: ScamVerdictSchema.optional(),
   risk_level: RiskLevelSchema.optional(),
@@ -143,4 +163,3 @@ export const AnalysisResponseSchema = z.object({
   created_at: z.string().datetime(),
 });
 export type AnalysisResponse = z.infer<typeof AnalysisResponseSchema>;
-

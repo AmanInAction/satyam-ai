@@ -27,7 +27,7 @@ export default function AnalyzePage() {
       </main>
 
       <footer className="mt-12 flex w-full flex-col items-center justify-between gap-2 border-t border-[#e2e4dc] pt-6 text-center text-xs text-[#70786f] sm:flex-row">
-        <span>SatyamAI provides advisory safety checks and does not store personal content.</span>
+        <span>History is opt-in. Saved checks may include submitted or extracted text and remain until deleted.</span>
         <span>National Cyber Crime Helpline: 1930 | cybercrime.gov.in</span>
       </footer>
       </div>

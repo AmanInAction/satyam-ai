@@ -1,26 +1,28 @@
 # SatyamAI — Development Roadmap
 
-**Updated:** 2026-10-13  
-**Owner:** Solo developer  
+**Updated:** 2026-11-04
+**Owner:** Solo developer
 **Target submission:** 2026-11-13 to 2026-11-14
 
-Read `SOURCE_OF_TRUTH.md` first. This roadmap sequences implementation; the source of truth defines intended behavior. Dates are targets, not evidence of completion.
+Read `SOURCE_OF_TRUTH.md` first. This roadmap sequences implementation; the source of truth defines intended behavior. Dates are targets, not evidence of completion. “Implemented” means code and automated tests exist; it does not imply live credentials, production deployment, or manual release checks have been verified. Historical test totals and live-check notes below refer to their dated phase reports; the latest local verification is recorded at the top of this file and in `docs/REPOSITORY_AUDIT.md`.
 
 ## Current known baseline
 
-The migration report says the repository was moved to a full-stack Next.js App Router modular monolith, with TypeScript Route Handlers, Zod, provider interfaces, a mock adapter, an analysis orchestrator, and 19 passing tests at the time of that report. Real Bedrock/evidence/reputation integrations and user-facing accuracy are **not verified by that report**. Re-run commands and inspect current files before relying on prior status.
+This checkout contains the Next.js App Router application and completed implementation work for Phases 0–10. Local verification on 2026-11-04: `npm test` passed (234 tests, 20 files), `npm run lint` passed, and `npm run build` passed. Next.js warned that it selected the parent `C:\Users\Asus\package-lock.json` as the workspace root because multiple lockfiles exist. Deployment/runtime behavior remains to be verified. See `docs/REPOSITORY_AUDIT.md` for current evidence and gaps.
+
+**Release status: NOT READY FOR PRODUCTION.** Open gates include verifying configured live integrations and PayPal sandbox, deploying/testing the remote Turso database, configuring Telegram webhook if in scope, and completing manual browser/accessibility and deployment smoke checks.
 
 ## Phase 0 — Repository and requirement audit
-**Status:** Completed & Verified (2026-10-13)
+**Status:** Re-audited 2026-11-04; local baseline established
 
 - [x] Full-stack Next.js migration recorded in prior migration report.
 - [x] Confirm current branch, working tree, file layout, scripts, tests, environment template, and deployment settings.
 - [x] Map every requirement in `SOURCE_OF_TRUTH.md` to actual code (`docs/REPOSITORY_AUDIT.md`).
 - [x] Confirm no stale FastAPI/Express/Vite instructions remain in active docs.
-- [x] Identify provider credentials, account setup, current API contracts, pricing, and quotas (`GEMINI_API_KEY` present; AWS/Bedrock unconfigured in container).
+- [x] Record supported provider configuration names from `.env.example`; do not infer secrets or service readiness from the template. Target-environment credentials, pricing, and quotas remain unverified.
 - [x] Mark real integrations versus mocks (`MockLLMProvider`, `MockEvidenceProvider`, `MockReputationProvider` clearly labeled).
 
-**Gate:** Current audit report reflects the actual repository, verified with real command outputs.
+**Gate:** Current audit report reflects the actual repository and separates local evidence from production/manual checks.
 
 ## Phase 1 — API contract and analysis skeleton
 **Status:** Completed & Verified (2026-10-13)
@@ -89,22 +91,22 @@ The migration report says the repository was moved to a full-stack Next.js App R
 
 ## Phase 6 — Security, privacy, reliability, UX
 **Priority:** P0 release gate  
-**Status:** Completed & Verified (2026-10-18)
+**Status:** Implemented; automated checks pass; production/manual release verification remains open
 
 - [x] Verified live Amazon Bedrock inference: direct model invocation and end-to-end `POST /api/v1/analyze/text` route successfully tested using `anthropic.claude-3-haiku-20240307-v1:0` in `ap-south-1` with approximately 5.3s direct response, confirming strict JSON output, signal fusion with deterministic rules, and contextual guidance.
 - [x] Audit prompt injection and treat submitted/retrieved content as untrusted (`sanitizeUntrustedSubmission` neutralizes XML sandbox escaping; deterministic Rule 10 flags injection cues; `tests/phase6SecurityPrivacy.test.ts`).
 - [x] Verify SSRF protections if URL fetching is present (`src/lib/security/urlSecurity.ts` blocking loopback, 0.0.0.0, RFC1918 Class A/B/C, 169.254.0.0/16 cloud metadata, obfuscated IPs, unsafe ports; 23 tests passing).
 - [x] Verify rate limits, bounded retries, timeouts, redacted logs, security headers, and CORS (`src/lib/security/rateLimiter.ts` sliding-window rate limiting with HTTP 429 Retry-After; `src/lib/security/logger.ts` redacting AWS keys, tokens, CVVs, passwords; `next.config.mjs` security headers and CORS preflight; `OPTIONS` handlers on all API routes).
 - [x] Verify secrets are server-only and `.env.example` contains placeholders only (zero client-exposed secrets; `.env.example` clean).
-- [x] Confirm raw content is not persisted by default (zero database/disk persistence for raw submissions).
+- [x] Make history saving explicit per analysis and disclose that opted-in records remain until deleted.
 - [x] Test graceful partial results for provider outages (`AnalysisOrchestrator` preserves deterministic scam risk and safe unverified claim status when upstream LLM or evidence search fails).
 - [x] Complete keyboard, mobile, loading, empty, error, and partial-result UX checks (`components/AnalysisDashboard.tsx` with responsive layout, tabs, keyboard shortcuts, error banners, loading indicators).
 
-**Gate:** all exceptions are documented, high-risk failures fixed, and release criteria verified. (PASS - 144 automated tests passing across 14 test suites)
+**Gate:** Automated security and reliability tests pass. Production CORS/HTTPS, live secret configuration, and manual UI checks are still unverified in this checkout.
 
 ## Phase 7 — Evaluation and release candidate
 **Target:** feature-complete by Nov 5; tested build by Nov 12  
-**Status:** Completed & Verified (2026-10-18)
+**Status:** Evaluation dataset and automated checks implemented; release-candidate checks remain open
 
 - [x] Build a versioned evaluation set with legitimate, fraudulent, ambiguous, and unsupported cases (`src/lib/evaluation/evaluationDataset.ts`, defining all 18 scenarios with strict pass/fail rules).
 - [x] Include English, Hindi, Hinglish, URLs, and claims with supporting/contradicting/no evidence (Scenarios 1–18 covering phishing, UPI PIN traps, digital arrest, utility threats, benign banking notices, encyclopedic claims, and blurry screenshots).
@@ -115,11 +117,11 @@ The migration report says the repository was moved to a full-stack Next.js App R
 - [x] Document known limitations and demo cases (documented in `docs/TEST_PLAN.md` and `docs/API_CONTRACT.md`).
 - [x] Rehearse the demo from a clean session (verified desktop and mobile layout, 10 quick presets, copyable report, and National Cyber Crime 1930 prompts).
 
-**Gate:** primary flows work on desktop/mobile; no unreported critical failure or fabricated evidence. (PASS - Release Candidate Ready)
+**Gate:** Automated evaluation and local build pass. Desktop/mobile manual checks and target-deployment smoke tests remain pending; this is not yet a release-candidate sign-off.
 
 ## Phase 8 — Telegram Bot MVP & Optional differentiators
 **Priority:** Differentiator (P1)  
-**Status:** Completed & Verified (2026-10-18)
+**Status:** Implemented and covered by automated tests; live Telegram setup remains unverified
 
 - [x] Secure Telegram Webhook endpoint implemented at `/api/v1/telegram/webhook` (`app/api/v1/telegram/webhook/route.ts`).
 - [x] Secret token authentication via `X-Telegram-Bot-Api-Secret-Token` header matching `TELEGRAM_WEBHOOK_SECRET`.
@@ -132,11 +134,11 @@ The migration report says the repository was moved to a full-stack Next.js App R
 - [x] Privacy and security: Zero raw message persistence, redacted logging, server-only tokens, per-chat sliding-window rate limiting.
 - [x] 17 focused automated tests passing in `tests/telegramWebhook.test.ts` (182 total repository tests passing).
 
-**Gate:** feature is real, tested, documented, and does not regress core functionality. (PASS - Telegram MVP Verified)
+**Gate:** Route and tests exist. Configure the production bot/webhook and verify an end-to-end live exchange before claiming production readiness.
 
 ## Phase 9 — PayPal Sandbox & Credit Monetization Engine
 **Priority:** Hackathon Requirement (P0 / Differentiator)  
-**Status:** Completed & Verified (2026-10-19)
+**Status:** Credit ledger and PayPal integration implemented; configured sandbox E2E and production readiness remain open
 
 - [x] **Credit-Based Freemium Model:**
   - Eligible new users receive exactly 3 free verification credits on first initialization (`getOrCreateUser`).
@@ -146,7 +148,7 @@ The migration report says the repository was moved to a full-stack Next.js App R
   - Concurrent request mutexes prevent double-spending or race conditions.
   - Client balances cannot be manipulated; the server ledger is authoritative at all times.
 - [x] **PayPal Sandbox Integration:**
-  - Official PayPal Orders v2 and OAuth 2.0 client credentials integration (`src/lib/payments/paypalClient.ts`).
+  - PayPal Orders v2 and OAuth 2.0 client credentials integration (`src/lib/payments/paypalClient.ts`); when credentials are absent, the code deliberately uses simulated sandbox orders.
   - Sandbox-first default mode (`PAYPAL_ENV=sandbox`, `https://api-m.sandbox.paypal.com`) with zero risk to customer funds.
   - Server-side order creation (`POST /api/v1/payments/create-order`) and server-side capture verification (`POST /api/v1/payments/capture-order`).
   - Strict validation of order status (`COMPLETED`), currency (`USD` or `INR`), amount, merchant/payee, and package matching.
@@ -169,11 +171,11 @@ The migration report says the repository was moved to a full-stack Next.js App R
   - Essential Scam Safety Guidance Card: Preserves vital scam defense rules (Helpline 1930, never share OTP/UPI PIN, no digital arrest) even when credits are exhausted.
 - [x] 14 focused automated tests in `tests/paymentsMonetization.test.ts` (196 total repository tests passing across 17 suites).
 
-**Gate:** Credit freemium model and PayPal Sandbox purchase flow are real, atomic, idempotent, auditable, and verified end-to-end without regressing core analysis. (PASS - Phase 9 Verified)
+**Gate:** Automated tests pass. Configure PayPal sandbox credentials/webhook and verify the actual approval, capture, and webhook paths before describing a live sandbox flow as verified. Production payments are a separate future go-live decision.
 
 ## Phase 10 — Node 22 Native SQLite Persistence, User Authentication & Scan History
 **Priority:** P1  
-**Status:** Completed & Verified (2026-10-23)
+**Status:** Local SQLite/auth/history and Turso adapter implemented; remote production database operation remains unverified
 
 - [x] **Zero-Dependency Native SQLite Engine (`src/lib/db/database.ts`):**
   - Powered by Node 22 native `node:sqlite` (`DatabaseSync`) in WAL mode with zero external C++ bindings.
@@ -186,18 +188,45 @@ The migration report says the repository was moved to a full-stack Next.js App R
 - [x] **Anonymous-to-Account Data Migration:**
   - Automatically migrates checks, transaction ledger history, and scan records from anonymous sessions to authenticated accounts upon registration or login.
 - [x] **Searchable Scan History with Privacy Controls (`/api/v1/history`):**
-  - Automatically saves text, URL, and screenshot analyses.
+  - Saves text, URL, and screenshot analyses only after per-check opt-in.
   - Search by keyword or verdict, pagination, and detail inspection.
-  - Privacy by Default: individual scan deletion and complete history wipe.
+  - Individual scan deletion and complete history wipe; saved records do not expire automatically.
 - [x] **UI Integration:**
   - `AuthModal.tsx` for account creation, login, and profile view.
   - `HistoryModal.tsx` for searching, viewing, and clearing past scans.
   - Updated `CreditBar.tsx` with "Scan history" and "Account / Sign in" triggers.
 - [x] **Automated Test Validation:**
   - 12 dedicated tests in `tests/sqliteAuthHistory.test.ts`.
-  - **218 total repository tests passing across 19 suites (100% pass rate).**
+  - Current repository suite: **234 tests passing across 20 files** (verified 2026-11-04).
 
-**Gate:** SQLite database, user authentication, data migration, and scan history are verified end-to-end with zero compilation errors and full test coverage. (PASS - Phase 10 Verified)
+**Privacy behavior:** Analyses are not saved by default. Per-check opt-in stores an input preview and complete result; image extracted text can therefore persist until the user deletes the record. There is no automatic expiry.
+
+**Gate:** Local automated coverage passes. Apply the schema, perform a backed-up Turso migration, verify production persistence/deletion, and run a deployment smoke test before claiming the production path is verified.
+
+## Phase 11 — Production readiness and release sign-off
+**Priority:** Required before production launch / Nov 13–14 submission
+**Status:** Remaining
+
+- [x] Make scan-history persistence opt-in and align the UI, API contract, privacy copy, and tests. Verify deletion and no-expiry behavior against the deployed database.
+- [ ] Verify and document which real providers are configured in the target environment (Bedrock, Google Fact Check/Safe Browsing, and vision); confirm provider-status behavior when unavailable.
+- [ ] Configure and run PayPal sandbox approval/capture and signed webhook tests with real sandbox credentials; do not enable production payments without a separate approval and operational checklist.
+- [ ] Configure Telegram bot secret/webhook and verify one end-to-end message if Telegram is part of the submission.
+- [ ] Provision Turso, apply migrations, migrate data only with a reviewed backup/change window, and verify create/read/delete behavior remotely.
+- [ ] Run production deployment smoke checks for health, analysis, authentication/history deletion, credits, CORS/security headers, and recovery from missing providers.
+- [ ] Perform manual desktop/mobile, keyboard, and screen-reader/accessibility checks; record what was not checked.
+- [ ] Confirm backup/restore, data retention, support/reporting information, and final demo evidence.
+
+**Exit gate:** each applicable checklist item has dated evidence, open limitations are accepted by the owner, and no documentation describes unverified integrations or privacy behavior as complete.
+
+## Explicitly deferred backlog
+
+- Browser extension.
+- Reverse-image search, deepfake detection, and advanced media forensics.
+- Social/community features and admin portal.
+- Custom model training.
+- Safe caching until a demonstrated need and privacy-safe invalidation policy exist.
+- Feedback capture until a consent and handling policy is defined.
+- Microservices or additional infrastructure without demonstrated operational need.
 
 ## Submission buffer — Nov 13–14
 
